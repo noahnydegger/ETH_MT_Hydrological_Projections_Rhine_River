@@ -7,23 +7,25 @@
 
 venv/
 
-# python
+# Python-related
 *__pycache__
 
 # R-related
 .Rhistory         # R session history
+.Rprofile         # R profile configuration
 .RData            # R workspace data
-.Ruserdata/         # R user data
-.Rproj.user/        # RStudio project-specific files
+.Ruserdata/        # R user data
+.Rproj.user/       # RStudio project-specific files
 .Rapp.history      # R application history
 .Rapp.default      # R application default settings
-# R package cache
 .Renviron          # Custom R environment settings
-/renv              # renv environment directory
+
+# Ignore renv/ folder, but keep renv.lock file for reproducibility
+renv/
+!renv.lock         # Keep this to ensure project reproducibility
 
 # jupyter
 *.ipynb_checkpoints
-
 
 # Plots that are created by the code
 *Plots*/

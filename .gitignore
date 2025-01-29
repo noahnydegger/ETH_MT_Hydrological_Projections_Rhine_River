@@ -4,6 +4,7 @@
 
 # System-related
 **/.DS_Store         # macOS file system metadata
+.DS_Store
 
 venv/
 

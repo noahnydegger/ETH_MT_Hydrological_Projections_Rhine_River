@@ -3,7 +3,7 @@
 *.env
 
 # System-related
-.DS_Store         # macOS file system metadata
+**/.DS_Store         # macOS file system metadata
 
 venv/
 
@@ -29,3 +29,4 @@ renv/
 
 # Plots that are created by the code
 *Plots*/
+.Rproj.user

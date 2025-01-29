@@ -5,9 +5,9 @@ library(dplyr)
 library(here)
 
 # change what should be plotted
-out_var <- "Temperature"
-knmi_var <- "tair_full.stats"
-stan_var <- "temp_full.stat"
+out_var <- "Precipitation"
+knmi_var <- "prec_full.stats"
+stan_var <- "prec_full.stat"
 
 data_dir <- "Data"
 gebiet <- "TGl200"
@@ -40,10 +40,15 @@ monthly_means <- function(data) {
     group_by(YearMonth) %>%
     summarise(
       Month = first(MM),
-      MeanMax = mean(MAX, na.rm = TRUE),
-      MeanMin = mean(MIN, na.rm = TRUE),
-      MeanAvg = mean(AVG, na.rm = TRUE),
-      MeanStd = mean(STDEV, na.rm = TRUE)
+      MaxMax = max(MAX, na.rm = TRUE),
+      MinMin = min(MIN, na.rm = TRUE),
+      SumAvg = sum(AVG, na.rm = TRUE),
+      MeanStd = mean(STDEV, na.rm = TRUE),
+      # Number of wet days (prec > 0)
+      WetDays = sum(AVG > 0, na.rm = TRUE),
+      
+      # Wet day intensity (average precipitation for days with prec > 0)
+      WetDayIntensity = mean(AVG[AVG > 0], na.rm = TRUE)
     )
   
   # Convert 'MM' (numeric month) to a factor and label with month abbreviations (e.g., Jan, Feb)
@@ -78,35 +83,28 @@ plot_monthly_boxplots <- function(data, variable_name, y_label) {
   ggplot(data, aes_string(x = "MonthAbb", y = variable_name, fill = "Source")) +
     geom_boxplot(position = position_dodge(width = 0.8)) +
     labs(
-      title = paste("Monthly", variable_name, "of Daily Temperature"),
+      title = paste("Monthly", variable_name, "of Daily Precipitation"),
       x = "Month",
       y = y_label,
       fill = "Dataset"
     ) +
     theme_minimal() +
     scale_fill_brewer(palette = "Set1")
-  ggsave(paste0("Plots/",variable_name , "_plot.pdf"), plot = last_plot(), device = "pdf", width = 10, height = 6)
+  
+  # save the plot as a pdf file
+  save_dir <- file.path(here::here(), "Plots", "Precipitation")
+  if (!dir.exists(save_dir)) {
+    dir.create(save_dir)
+  }
+  ggsave(file.path(save_dir, paste0(variable_name , "_plot.pdf")), plot = last_plot(), device = "pdf", width = 10, height = 6)
 }
 
 # Plot monthly boxplots for each variable
 # For each variable, call the function and specify the title and y-label
-plot_monthly_boxplots(combined_data, "MeanAvg", "Temperature (°C)")
-plot_monthly_boxplots(combined_data, "MeanMax", "Temperature (°C)")
-plot_monthly_boxplots(combined_data, "MeanMin", "Temperature (°C)")
-plot_monthly_boxplots(combined_data, "MeanStd", "Temperature (°C)")
-
-# # Plotting with ggplot
-# ggplot(combined_data, aes(x = MonthAbb, y = MeanAvg, fill = Source)) +
-#   geom_boxplot(position = position_dodge(width = 0.8)) +  # Boxplot for each month, grouped by Source
-#   labs(
-#     title = "Monthly Mean of Daily Average Temperature",
-#     x = "Month",
-#     y = "Temperature [°C]",
-#     fill = "Dataset"
-#   ) +
-#   theme_minimal() +
-#   scale_fill_brewer(palette = "Set1")  # Different color palette for the two sources
-# 
-# # Save the plot as a PDF
-# ggsave("Plots/monthly_temperature_plot.pdf", plot = last_plot(), device = "pdf", width = 10, height = 6)
+plot_monthly_boxplots(combined_data, "SumAvg", "Precipitation (mm/month)")
+plot_monthly_boxplots(combined_data, "MaxMax", "Precipitation (mm/day)")
+plot_monthly_boxplots(combined_data, "MinMin", "Precipitation (mm/day)")
+plot_monthly_boxplots(combined_data, "MeanStd", "Precipitation (mm/day)")
+plot_monthly_boxplots(combined_data, "WetDays", "Occurence (-)")
+plot_monthly_boxplots(combined_data, "WetDayIntensity", "Precipitation (mm/day)")
 

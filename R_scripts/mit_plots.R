@@ -59,57 +59,100 @@ monthly_means <- function(data) {
   return(monthly_data)
 }
 
+yearly_means <- function(data) {
+  # Compute yearly summary values for plotting
+  yearly_data <- data %>%
+    group_by(YYYY) %>%
+    summarise(
+      SumR0 = sum(RO, na.rm = TRUE),
+      SumR1 = sum(R1, na.rm = TRUE),
+      SumR2 = sum(R2, na.rm = TRUE),
+      SumRGES = sum(RGES, na.rm = TRUE),
+      SumP_SME = sum(P.SME, na.rm = TRUE),
+      SumGLAC = sum(GLAC, na.rm = TRUE),
+      SumEPOT = sum(EPOT, na.rm = TRUE),
+      SumEREA = sum(EREA, na.rm = TRUE),
+      SumP_KOR = sum(P.kor, na.rm = TRUE),
+      MeanS_SNO = mean(S.SNO, na.rm = TRUE)
+    )
+  yearly_data <- yearly_data %>%
+    rename(Year = YYYY) %>%
+    mutate(Year = as.character(Year))
+  
+  return(yearly_data)
+}
+
 # Apply the function to both datasets
 knmi_data <- process_data(knmi_data)
 stan_data <- process_data(stan_data)
 
 # Calculate monthly means for both datasets
-knmi_means <- monthly_means(knmi_data)
-stan_means <- monthly_means(stan_data)
+knmi_months <- monthly_means(knmi_data)
+stan_months <- monthly_means(stan_data)
+
+# Calculate monthly means for both datasets
+knmi_years <- yearly_means(knmi_data)
+stan_years <- yearly_means(stan_data)
 
 # Add a 'Source' column to distinguish between the datasets
-knmi_means$Source <- "KNMI"
-stan_means$Source <- "STAN"
+knmi_months$Source <- "KNMI"
+knmi_years$Source <- "KNMI"
+stan_months$Source <- "STAN"
+stan_years$Source <- "STAN"
 
 # Combine the two datasets
-combined_data <- bind_rows(stan_means, knmi_means)
-combined_data$Source <- factor(combined_data$Source, levels = c("STAN", "KNMI"))
+combined_months <- bind_rows(stan_months, knmi_months)
+combined_months$Source <- factor(combined_months$Source, levels = c("STAN", "KNMI"))
+combined_years <- bind_rows(stan_years, knmi_years)
+combined_years$Source <- factor(combined_years$Source, levels = c("STAN", "KNMI"))
 
 # Sort combined_data by YearMonth in place
-combined_data <- combined_data %>%
+combined_months <- combined_months %>%
   arrange(YearMonth)
 
-# Define the plot function
-plot_monthly_boxplots <- function(data, variable_name, y_label) {
-  ggplot(data, aes_string(x = "MonthAbb", y = variable_name, fill = "Source")) +
+# Sort combined_data by Year in place
+combined_years <- combined_years %>%
+  arrange(Year)
+
+plot_monthly_with_yearly_boxplots <- function(monthly_data, yearly_data, variable_name, stat, y_label, unit) {
+  # Plot monthly boxplots
+  p <- ggplot(monthly_data, aes_string(x = "MonthAbb", y = variable_name, fill = "Source")) +
     geom_boxplot(position = position_dodge(width = 0.8)) +
     labs(
-      title = paste("Monthly Sum of", y_label),
-      x = "Month",
-      y = y_label,
+      title = paste("Monthly and Yearly", stat, "of Daily", y_label),
+      x = "Time Period",
+      y = paste(y_label, unit),
       fill = "Dataset"
     ) +
     theme_minimal() +
     scale_fill_brewer(palette = "Set1")
+  
+  # Add yearly boxplot to the existing plot
+  p + 
+    geom_boxplot(
+      data = yearly_data, 
+      aes(x = "Year", y = !!sym(variable_name) / 12, fill = Source), 
+      position = position_dodge(width = 0.8)
+    )
   
   # save the plot as a pdf file
   save_dir <- file.path(here::here(), "Plots", "All_Components")
   if (!dir.exists(save_dir)) {
     dir.create(save_dir)
   }
-  ggsave(file.path(save_dir, paste0(variable_name , "_plot.pdf")), plot = last_plot(), device = "pdf", width = 10, height = 6)
+  ggsave(file.path(save_dir, paste0(variable_name , "_plot.pdf")), plot = last_plot(), device = "pdf", width = 12, height = 6)
 }
 
 # Plot monthly boxplots for each variable
-# For each variable, call the function and specify the title and y-label
-plot_monthly_boxplots(combined_data, "SumRGES", "Total runoff [mm/month]")
-plot_monthly_boxplots(combined_data, "SumR0", "Surface runoff [mm/month]")
-plot_monthly_boxplots(combined_data, "SumR1", "Interflow [mm/month]")
-plot_monthly_boxplots(combined_data, "SumR2", "Total baseflow [mm/month]")
-plot_monthly_boxplots(combined_data, "SumP_SME", "Snowmelt [mm/month]")
-plot_monthly_boxplots(combined_data, "SumGLAC", "Ice melt [mm/month]")
-plot_monthly_boxplots(combined_data, "MeanS_SNO", "Snow water equivalent [mm]")
-plot_monthly_boxplots(combined_data, "SumEPOT", "Potential Evapotranspiration [mm/month]")
-plot_monthly_boxplots(combined_data, "SumEREA", "Actual Evapotranspiration [mm/month]")
-plot_monthly_boxplots(combined_data, "SumP_KOR", "Adjusted interpolated precipitation [mm/month]")
+plot_monthly_with_yearly_boxplots(combined_months, combined_years, "SumRGES", "Sum", "Total runoff", "[mm/month]")
+plot_monthly_with_yearly_boxplots(combined_months, combined_years, "SumR0", "Sum", "Surface runoff", "[mm/month]")
+plot_monthly_with_yearly_boxplots(combined_months, combined_years, "SumR1", "Sum", "Interflow", "[mm/month]")
+plot_monthly_with_yearly_boxplots(combined_months, combined_years, "SumR2", "Sum", "Total baseflow", "[mm/month]")
+plot_monthly_with_yearly_boxplots(combined_months, combined_years, "SumP_SME", "Sum", "Snowmelt", "[mm/month]")
+plot_monthly_with_yearly_boxplots(combined_months, combined_years, "SumGLAC", "Sum", "Ice melt", "[mm/month]")
+plot_monthly_with_yearly_boxplots(combined_months, combined_years, "SumEPOT", "Sum", "Potential Evapotranspiration", "[mm/month]")
+plot_monthly_with_yearly_boxplots(combined_months, combined_years, "SumEREA", "Sum", "Actual Evapotranspiration", "[mm/month]")
+plot_monthly_with_yearly_boxplots(combined_months, combined_years, "SumP_KOR", "Sum", "Adjusted interpolated precipitation", "[mm/month]")
+#plot_monthly_with_yearly_boxplots(combined_months, combined_years, "MeanS_SNO", "Mean", "Snow water equivalent", "[mm]")
+
 

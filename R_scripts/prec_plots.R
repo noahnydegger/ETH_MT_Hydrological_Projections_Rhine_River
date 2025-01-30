@@ -4,7 +4,6 @@ library(ggplot2)
 library(dplyr)
 library(here)
 
-# change what should be plotted
 out_var <- "Precipitation"
 knmi_var <- "prec_full.stats"
 stan_var <- "prec_full.stat"
@@ -58,53 +57,95 @@ monthly_means <- function(data) {
   return(monthly_data)
 }
 
+yearly_means <- function(data) {
+  # Compute yearly summary values for plotting
+  yearly_data <- data %>%
+    group_by(YYYY) %>%
+    summarise(
+      MaxMax = max(MAX, na.rm = TRUE),
+      MinMin = min(MIN, na.rm = TRUE),
+      SumAvg = sum(AVG, na.rm = TRUE) / 12,  # Divide by 12 to get monthly average
+      MeanStd = mean(STDEV, na.rm = TRUE),
+      # Number of wet days (prec > 0)
+      WetDays = sum(AVG > 0, na.rm = TRUE) / 12,  # Divide by 12 to get monthly average
+      
+      # Wet day intensity (average precipitation for days with prec > 0)
+      WetDayIntensity = mean(AVG[AVG > 0], na.rm = TRUE)
+    )
+  
+  yearly_data <- yearly_data %>%
+    rename(Year = YYYY) %>%
+    mutate(Year = as.character(Year))
+  
+  return(yearly_data)
+}
+
 # Apply the function to both datasets
 knmi_data <- process_data(knmi_data)
 stan_data <- process_data(stan_data)
 
 # Calculate monthly means for both datasets
-knmi_means <- monthly_means(knmi_data)
-stan_means <- monthly_means(stan_data)
+knmi_months <- monthly_means(knmi_data)
+stan_months <- monthly_means(stan_data)
+
+# Calculate monthly means for both datasets
+knmi_years <- yearly_means(knmi_data)
+stan_years <- yearly_means(stan_data)
 
 # Add a 'Source' column to distinguish between the datasets
-knmi_means$Source <- "KNMI"
-stan_means$Source <- "STAN"
+knmi_months$Source <- "KNMI"
+knmi_years$Source <- "KNMI"
+stan_months$Source <- "STAN"
+stan_years$Source <- "STAN"
 
 # Combine the two datasets
-combined_data <- bind_rows(stan_means, knmi_means)
-combined_data$Source <- factor(combined_data$Source, levels = c("STAN", "KNMI"))
+combined_months <- bind_rows(stan_months, knmi_months)
+combined_months$Source <- factor(combined_months$Source, levels = c("STAN", "KNMI"))
+combined_years <- bind_rows(stan_years, knmi_years)
+combined_years$Source <- factor(combined_years$Source, levels = c("STAN", "KNMI"))
 
 # Sort combined_data by YearMonth in place
-combined_data <- combined_data %>%
+combined_months <- combined_months %>%
   arrange(YearMonth)
 
-# Define the plot function
-plot_monthly_boxplots <- function(data, variable_name, y_label) {
-  ggplot(data, aes_string(x = "MonthAbb", y = variable_name, fill = "Source")) +
+# Sort combined_data by Year in place
+combined_years <- combined_years %>%
+  arrange(Year)
+
+plot_monthly_with_yearly_boxplots <- function(monthly_data, yearly_data, variable_name, stat, daily_value, y_label) {
+  # Plot monthly boxplots
+  p <- ggplot(monthly_data, aes_string(x = "MonthAbb", y = variable_name, fill = "Source")) +
     geom_boxplot(position = position_dodge(width = 0.8)) +
     labs(
-      title = paste("Monthly", variable_name, "of Daily Precipitation"),
-      x = "Month",
+      title = paste("Monthly and Yearly", stat, "of Daily", daily_value, "Precipitation"),
+      x = "Time Period",
       y = y_label,
       fill = "Dataset"
     ) +
     theme_minimal() +
     scale_fill_brewer(palette = "Set1")
   
+  # Add yearly boxplot to the existing plot
+  p + 
+    geom_boxplot(
+      data = yearly_data, 
+      aes(x = "Year", y = !!sym(variable_name), fill = Source), 
+      position = position_dodge(width = 0.8)
+    )
+  
   # save the plot as a pdf file
   save_dir <- file.path(here::here(), "Plots", "Precipitation")
   if (!dir.exists(save_dir)) {
     dir.create(save_dir)
   }
-  ggsave(file.path(save_dir, paste0(variable_name , "_plot.pdf")), plot = last_plot(), device = "pdf", width = 10, height = 6)
+  ggsave(file.path(save_dir, paste0(variable_name , "_plot.pdf")), plot = last_plot(), device = "pdf", width = 12, height = 6)
 }
 
 # Plot monthly boxplots for each variable
-# For each variable, call the function and specify the title and y-label
-plot_monthly_boxplots(combined_data, "SumAvg", "Precipitation (mm/month)")
-plot_monthly_boxplots(combined_data, "MaxMax", "Precipitation (mm/day)")
-plot_monthly_boxplots(combined_data, "MinMin", "Precipitation (mm/day)")
-plot_monthly_boxplots(combined_data, "MeanStd", "Precipitation (mm/day)")
-plot_monthly_boxplots(combined_data, "WetDays", "Occurence (-)")
-plot_monthly_boxplots(combined_data, "WetDayIntensity", "Precipitation (mm/day)")
+plot_monthly_with_yearly_boxplots(combined_months, combined_years, "SumAvg", "Sum", "avg.", "Precipitation [mm/month]")
+plot_monthly_with_yearly_boxplots(combined_months, combined_years, "MaxMax", "Max", "max", "Precipitation [mm/day]")
+plot_monthly_with_yearly_boxplots(combined_months, combined_years, "MinMin", "Min", "min", "Precipitation [mm/day]")
+plot_monthly_with_yearly_boxplots(combined_months, combined_years, "MeanStd", "Mean", "std.", "Precipitation [mm/day]")
+plot_monthly_with_yearly_boxplots(combined_months, combined_years, "WetDays", "Wet Days (P > 0)", "avg.", "Occurence []")
+plot_monthly_with_yearly_boxplots(combined_months, combined_years, "WetDayIntensity", "Wet Day Intensity", "avg.", "Precipitation [mm/day]")
 

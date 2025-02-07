@@ -28,6 +28,9 @@ renv/
 # jupyter
 *.ipynb_checkpoints
 
+# Data
+Data/
+
 # Plots that are created by the code
 *Plots*/
 .Rproj.user

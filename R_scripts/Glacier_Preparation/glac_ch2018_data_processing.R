@@ -3,7 +3,6 @@ library(ggplot2)
 library(dplyr)
 library(here)
 
-#variable <- "temp_full.stats"
 period_lenght <- 10
 gebiet <- "ThS"
 

@@ -3,8 +3,8 @@ library(ggplot2)
 library(dplyr)
 library(here)
 
-variable <- "temp_full.stats"
-
+#variable <- "temp_full.stats"
+period_lenght <- 10
 gebiet <- "ThS"
 
 chains_vs_glac_file <- "chains_vs_glac_ch2018.dat"
@@ -46,7 +46,7 @@ process_meteo_data <- function(file) {
   data <- data %>% filter(YYYY >= 1981)
   
   # Add a new column for 5-year periods (with the period ending in the last year)
-  data$Period <- (as.numeric(data$YYYY) + 4) %/% 5 * 5
+  data$Period <- (as.numeric(data$YYYY) + period_lenght - 1) %/% period_lenght * period_lenght
   
   # Remove columns YYYY, MM, DD
   data <- data %>% select(-YYYY, -MM, -DD)

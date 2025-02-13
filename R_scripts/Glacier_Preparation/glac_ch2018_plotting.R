@@ -6,11 +6,9 @@ library(scales)
 library(here)
 
 # Set flags to control plotting behavior
-plot_individual_chains <- FALSE  # Set to TRUE to make a plot for every chain.
+plot_individual_chains <- TRUE  # Set to TRUE to make a plot for every chain.
 plot_head <- FALSE               # Set to TRUE to plot only the head (first few chains), FALSE to plot all
 plot_RCP_groups <- TRUE         # Set to TRUE to plot temperature by RCP groups
-
-
 
 # Check if a variable exists
 if (!exists("processed_data_list")) {
@@ -30,6 +28,7 @@ chains_to_plot <- if (plot_head) {
 if (plot_individual_chains) {
   lapply(chains_to_plot, function(chain_name) {
     data <- processed_data_list[[chain_name]]
+    data <- data %>% filter(!is.na(temp_AVG), !is.na(prec_AVG))
     
     # Get the min and max values for scaling the secondary y-axis (precipitation)
     temp_min <- min(data$temp_AVG, na.rm = TRUE)
@@ -49,8 +48,10 @@ if (plot_individual_chains) {
       geom_line(aes(x = YYYY, y = temp_AVG, color = "Temperature"), size = 1) +   
       # Precipitation bar
       #geom_bar(aes(x = YYYY, y = prec_AVG, fill = "Precipitation"), stat = "identity", position = "dodge", alpha = 0.5) + 
-      geom_step(aes(x = YYYY, y = (prec_AVG * a + b), color = "Precipitation"), size = 1, direction = "hv") + 
-      labs(title = paste("5-Year Mean Temperature and Precipitation"),
+      #geom_step(aes(x = YYYY, y = (prec_AVG * a + b), color = "Precipitation"), size = 1, direction = "vh") + 
+      geom_segment(aes(x = YYYY, xend = lead(YYYY), y = (prec_AVG * a + b), yend = (prec_AVG * a + b), color = "Precipitation"),
+                   size = 1, na.rm = TRUE) +
+      labs(title = paste("10-Year Mean Temperature, Precipitation"),
            x = "Year",
            y = "Temperature (°C)",
            color = "Legend") +
@@ -66,6 +67,8 @@ if (plot_individual_chains) {
         )
       )
     
+    # Glacier plot
+    data <- processed_data_list[[chain_name]]
     # Filter the data once and split it into two sets
     data_before_2015 <- data %>% filter(YYYY <= 2015, 
                                         !is.na(count_abla), 
@@ -75,9 +78,6 @@ if (plot_individual_chains) {
                                        !is.na(count_abla), 
                                        !is.na(count_accu), 
                                        !is.na(count_glac))
-    
-    # Glacier plot
-    # Glacier plot
     glac_plot <- ggplot() +
       # Data before 2015 (dashed lines)
       geom_line(data = data_before_2015, aes(x = YYYY, y = count_abla / count_area * 100, color = "Ablation", linetype = "Past Data"), size = 1) +
@@ -98,7 +98,10 @@ if (plot_individual_chains) {
       ) +
       scale_linetype_manual(values = c("Past Data" = "dashed", "Projected Data" = "solid")) +  # Define line types
       # Adjust legend appearance to make lines more distinguishable
-      guides(linetype = guide_legend(keywidth = 2, keyheight = 1.5)) +  # Adjust key size for better visibility
+      guides(
+        linetype = guide_legend(order = 1, keywidth = 2, keyheight = 1),
+        color = guide_legend(order = 2)
+      ) +
       theme_minimal() +
       theme(legend.position = "top", plot.title = element_text(hjust = 0.5)) +
       scale_x_continuous(limits = range(data$YYYY))  # Align x-axis range with meteo_plot
@@ -161,6 +164,7 @@ plot_temperature_by_chain <- function(processed_data_list, selection) {
   
   # Combine all the data into one data frame
   combined_data <- bind_rows(plot_data)
+  combined_data <- combined_data %>% filter(!is.na(YYYY), !is.na(temp_AVG), !is.na(MaxTemp))
   
   # Plot all lines in the same plot, color by MaxTemp
   ggplot(combined_data, aes(x = YYYY, y = temp_AVG, group = Chain, color = MaxTemp)) +
@@ -182,14 +186,76 @@ plot_temperature_by_chain <- function(processed_data_list, selection) {
   }
   
   # Save the combined plot to PDF
-  ggsave(file.path(save_dir, paste0("subset_", selection, ".pdf")), plot = last_plot(), device = "pdf", width = 12, height = 12)
+  ggsave(file.path(save_dir, paste0("subset_temp_", selection, ".pdf")), plot = last_plot(), device = "pdf", width = 12, height = 12)
   
 }
 
+# Function to plot precipitation with varying color intensity
+plot_precipitation_by_chain <- function(processed_data_list, selection) {
+  
+  # Filter chain names based on the substring
+  selected_chains <- grep(selection, chains_to_plot, value = TRUE)
+  
+  # Check if selected_chains is empty, exit if so
+  if (length(selected_chains) == 0) {
+    return()  # Exit the function if no chains match the selection
+  }
+  
+  # Create an empty list to store the data for plotting
+  plot_data <- list()
+  
+  # Loop through the selected chains and prepare the data for plotting
+  for(chain_name in selected_chains) {
+    data <- processed_data_list[[chain_name]]
+    
+    # Get the maximum precipitation for each chain
+    max_prec <- mean(data$prec_AVG, na.rm = TRUE)
+    
+    # Add a new column 'Chain' for easy identification and 'MaxPrecip' for color
+    data$Chain <- chain_name
+    data$MaxPrecip <- max_prec
+    
+    # Append the data to the plot_data list
+    plot_data[[chain_name]] <- data
+  }
+  
+  # Combine all the data into one data frame
+  combined_data <- bind_rows(plot_data)
+  combined_data <- combined_data %>% filter(!is.na(YYYY), !is.na(prec_AVG), !is.na(MaxPrecip))
+  
+  # Plot all lines in the same plot, color by MaxPrecip
+  ggplot(combined_data, aes(x = YYYY, y = prec_AVG, group = Chain, color = MaxPrecip)) +
+    geom_line(size = 0.5) +  # Plot the lines
+    #geom_step(size = 0.5, direction = "hv") + 
+    scale_color_gradient(low = "lightgreen", high = "darkblue") +  # Color gradient by max precipitation
+    labs(title = paste("Precipitation for Chains Containing:", selection),
+         x = "Year",
+         y = "Precipitation (mm/d)",
+         color = "Max Precipitation") +
+    theme_minimal() +
+    theme(legend.position = "top", plot.title = element_text(hjust = 0.5))  # Center the title
+  
+  # Define save directory
+  save_dir <- file.path(here::here(), "Plots", "glac_2018")
+  
+  # Create the directory if it doesn't exist
+  if (!dir.exists(save_dir)) {
+    dir.create(save_dir, recursive = TRUE)
+  }
+  
+  # Save the combined plot to PDF
+  ggsave(file.path(save_dir, paste0("subset_prec_", selection, ".pdf")), plot = last_plot(), device = "pdf", width = 12, height = 12)
+}
 
 if (plot_RCP_groups) {
+  # Temperature
   plot_temperature_by_chain(processed_data_list, "RCP85")
   plot_temperature_by_chain(processed_data_list, "RCP45")
   plot_temperature_by_chain(processed_data_list, "RCP26")
+  
+  # Precipitation
+  plot_precipitation_by_chain(processed_data_list, "RCP85")
+  plot_precipitation_by_chain(processed_data_list, "RCP45")
+  plot_precipitation_by_chain(processed_data_list, "RCP26")
 }
 

@@ -89,7 +89,7 @@ stan_Rmean <- compute_runoff_statistics(stan_data)
 
 # Add a 'Source' column to distinguish between the datasets
 knmi_Rmean$Source <- "KNMI"
-stan_Rmean$Source <- "STAN"
+stan_Rmean$Source <- "observed"
 
 
 # Function to plot the statistics
@@ -100,7 +100,7 @@ plot_runoff_statistics <- function(daily_stats1, daily_stats2, y_label, variable
   q90col <- paste0("Q90", variable)
   
   combined_stats <- bind_rows(daily_stats1, daily_stats2)
-  combined_stats$Source <- factor(combined_stats$Source, levels = c("STAN", "KNMI"))
+  combined_stats$Source <- factor(combined_stats$Source, levels = c("observed", "KNMI"))
   
   # Compute NSE for the selected variable
   compute_nse <- function(observed, simulated) {
@@ -125,8 +125,8 @@ plot_runoff_statistics <- function(daily_stats1, daily_stats2, y_label, variable
       breaks = month_breaks
     ) +
     labs(
-      title = paste("30-day Moving Average (with Q10-Q90) of daily mean", y_label, " over 30 Years"),
-      subtitle = paste("NSE between STAN and KNMI:", round(nse_value, 3)),
+      title = paste("30-day Moving Average (with Q10-Q90) of daily mean", y_label, "over 30 Years Reference Period (1991-2020)"),
+      subtitle = paste("NSE between observed and KNMI:", round(nse_value, 3)),
       x = "Month",
       y = paste(y_label, "[mm/day]"),
       color = "Dataset",
@@ -134,8 +134,8 @@ plot_runoff_statistics <- function(daily_stats1, daily_stats2, y_label, variable
     ) +
     theme_minimal() +
     # Manually set colors and fills
-    scale_color_manual(values = c("STAN" = "red", "KNMI" = "blue")) +
-    scale_fill_manual(values = c("STAN" = "red", "KNMI" = "blue"))
+    scale_color_manual(values = c("observed" = "black", "KNMI" = "grey50")) +
+    scale_fill_manual(values = c("observed" = "black", "KNMI" = "grey50"))
   
   # save the plot as a pdf file
   save_dir <- file.path(here::here(), "Plots", gebiet, y_label)

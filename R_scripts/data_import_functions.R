@@ -43,6 +43,7 @@ import_pri_data <- function(file_path) {
   # Separate monthly and yearly data
   monthly_data <- pri_data %>% 
     filter(MM != 0) %>%   # Exclude yearly summary rows
+    mutate(YearMonth = paste(YYYY, sprintf("%02d", MM), sep = "-")) %>%  # Create Year-Month column
     select(-BASINID_DUP, -BASINID)  # Remove redundant ID columns
   
   yearly_data <- pri_data %>%

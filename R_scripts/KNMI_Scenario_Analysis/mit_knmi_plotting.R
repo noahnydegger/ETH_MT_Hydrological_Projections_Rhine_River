@@ -51,22 +51,31 @@ plot_monthly_with_yearly_boxplots <- function(mit_knmi_list, scenarios, area, c_
   yearly_df$Scenario <- factor(yearly_df$Scenario, levels = c("reference", "Hd_2100"))
   
   # Plot monthly boxplots
-  p <- ggplot(monthly_df, aes(x = MonthAbb, y = .data[[c_name]], fill = Scenario)) +
+  p <- ggplot(monthly_df, aes(x = MonthAbb, y = .data[[c_name]] / 30, fill = Scenario)) +
     geom_boxplot(position = position_dodge(width = 0.8)) +
     labs(
-      title = paste(stat, "monthly", y_label, "in sub basin", area),
+      title = paste("Monthly", stat, y_label, "in subbasin", area),
       x = "Month",
       y = paste(y_label, unit),
       fill = "Scenario"
     ) +
-    theme_minimal() +
+    theme_minimal(base_size = 14) +
+    theme(
+      text = element_text(color = "black"),  # Make all text black
+      axis.title.x = element_blank(),
+      axis.text = element_text(size = 14, color = "black"),  
+      axis.title = element_text(size = 16, face = "bold", color = "black"),  
+      legend.text = element_text(size = 14, color = "black"),  
+      legend.title = element_text(size = 16, face = "bold", color = "black"),  
+      plot.title = element_text(size = 18, face = "bold", hjust = 0.5, color = "black")  
+    ) +
     scale_fill_manual(values = scenario_colors)
   
   # Add yearly boxplot
   p <- p +
     geom_boxplot(
       data = yearly_df,
-      aes(x = "Year", y = .data[[c_name]] / 12, fill = Scenario),
+      aes(x = "Year", y = .data[[c_name]] / 365, fill = Scenario),
       position = position_dodge(width = 0.8)
     )
   
@@ -75,7 +84,7 @@ plot_monthly_with_yearly_boxplots <- function(mit_knmi_list, scenarios, area, c_
   if (!dir.exists(save_dir)) {
     dir.create(save_dir, recursive = TRUE, showWarnings = FALSE)
   }
-  ggsave(file.path(save_dir, paste0(area,"_", y_label, ".pdf")), plot = p, device = "pdf", width = 12, height = 6)
+  ggsave(file.path(save_dir, paste0(area,"_", y_label, ".pdf")), plot = p, device = "pdf", width = 18, height = 6)
 }
 
 # Loop through all combinations of areas, variables, and statistics
@@ -83,7 +92,7 @@ for (area in areas) {
   for (c_name in c_names) {
     for (stat in stats) {
       cat("Processing:", area, "-", c_name, "-", stat, "\n")  # Print progress
-      plot_monthly_with_yearly_boxplots(mit_knmi_list, scenarios, area, c_name, stat, "Runoff", "mm/month")
+      plot_monthly_with_yearly_boxplots(mit_knmi_list, scenarios, area, c_name, stat, "Runoff", "[mm/d]")
     }
   }
 }

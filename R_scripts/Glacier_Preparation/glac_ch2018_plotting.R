@@ -1,4 +1,5 @@
 library(ggplot2)
+library(dplyr)
 library(gridExtra)
 library(grid)
 library(cowplot)
@@ -6,7 +7,7 @@ library(scales)
 library(here)
 
 # Set flags to control plotting behavior
-plot_individual_chains <- TRUE  # Set to TRUE to make a plot for every chain.
+plot_individual_chains <- FALSE  # Set to TRUE to make a plot for every chain.
 plot_head <- FALSE               # Set to TRUE to plot only the head (first few chains), FALSE to plot all
 plot_RCP_groups <- TRUE         # Set to TRUE to plot temperature by RCP groups
 
@@ -247,6 +248,106 @@ plot_precipitation_by_chain <- function(processed_data_list, selection) {
   ggsave(file.path(save_dir, paste0("subset_prec_", selection, ".pdf")), plot = last_plot(), device = "pdf", width = 12, height = 12)
 }
 
+plot_mean_glacier_area <- function(processed_data_list) {
+  # Define the RCP scenarios
+  rcp_scenarios <- c("RCP26", "RCP45", "RCP85")
+  
+  # Loop through each RCP scenario and calculate the mean
+  mean_glacier_data_before_2015 <- list()
+  mean_glacier_data_after_2015 <- list()
+  
+  # Loop through each RCP scenario and calculate the mean
+  for (rcp in rcp_scenarios) {
+    selected_chains <- grep(rcp, chains_to_plot, value = TRUE)
+    selected_data <- processed_data_list[selected_chains]
+    
+    # Combine all data frames for the given RCP scenario
+    combined_data <- bind_rows(selected_data, .id = "Chain") %>%
+      group_by(YYYY) %>%
+      summarize(
+        mean_glac = mean(count_glac / count_area * 100, na.rm = TRUE),
+        .groups = "drop"
+      ) %>%
+      mutate(RCP = rcp)  # Add column for RCP
+    
+    # Separate the combined data into before and after 2015
+    data_before_2015 <- combined_data %>% filter(YYYY <= 2015) %>%
+      mutate(DataType = "Ovserved")  # Label as "Past Data"
+    
+    data_after_2015 <- combined_data %>% filter(YYYY >= 2015) %>%
+      mutate(DataType = "Projected")  # Label as "Projected Data"
+    
+    # Store the separated data
+    mean_glacier_data_before_2015[[rcp]] <- data_before_2015
+    mean_glacier_data_after_2015[[rcp]] <- data_after_2015
+  }
+  
+  # Prepare past data (black dashed lines)
+  data_before_2015 <- processed_data_list %>%
+    bind_rows(.id = "Chain") %>%
+    filter(YYYY <= 2015, !is.na(count_glac)) %>%
+    group_by(YYYY) %>%
+    summarize(mean_glac = mean(count_glac / count_area * 100, na.rm = TRUE), .groups = "drop") %>%
+    mutate(RCP = "Observed", DataType = "Observed")  # Add column for legend
+  
+  # Start ggplot
+  glac_plot <- ggplot()
+  
+  # Plot past data (black dashed lines)
+  glac_plot <- glac_plot +
+    geom_line(data = data_before_2015, aes(x = YYYY, y = mean_glac, linetype = DataType), 
+              color = "black", size = 1)
+  
+  # Define colors for RCP scenarios
+  rcp_colors <- c("RCP26" = "blue", "RCP45" = "orange", "RCP85" = "red")
+  
+  # Plot projected data for each RCP (solid lines)
+  for (rcp in rcp_scenarios) {
+    # Plot data after 2015 (solid lines)
+    glac_plot <- glac_plot +
+      geom_line(data = mean_glacier_data_after_2015[[rcp]], 
+                aes(x = YYYY, y = mean_glac, color = RCP, linetype = DataType), 
+                size = 1)
+  }
+  
+  # Finalize the plot with proper legend
+  glac_plot <- glac_plot +
+    labs(
+      title = "Mean Relative Glacier Area",
+      x = "Year",
+      y = "Relative Area (%)",
+      color = "RCP Scenario",
+      linetype = "Data Type"
+    ) +
+    scale_color_manual(values = rcp_colors) +  # Custom colors for RCPs
+    scale_linetype_manual(values = c("Observed" = "dashed", "Projected" = "solid")) +  # Linetype legend
+    guides(
+      linetype = guide_legend(order = 1, keywidth = 2, keyheight = 1),
+      color = guide_legend(order = 2)
+    ) +
+    theme_minimal(base_size = 16) +
+    theme(
+      legend.position = "top",
+      text = element_text(color = "black"),  # Make all text black
+      axis.title.x = element_blank(),
+      axis.text = element_text(size = 16, color = "black"),  
+      axis.title = element_text(size = 18, face = "bold", color = "black"),  
+      legend.text = element_text(size = 16, color = "black"),  
+      legend.title = element_text(size = 16, face = "bold", color = "black"),  
+      plot.title = element_text(size = 18, face = "bold", hjust = 0.5, color = "black")  
+    )
+  
+  # Define save directory
+  save_dir <- file.path(here::here(), "Plots", "glac_2018")
+  if (!dir.exists(save_dir)) {
+    dir.create(save_dir, recursive = TRUE)
+  }
+  
+  # Save the plot
+  ggsave(file.path(save_dir, "Mean_glac_Area.pdf"), plot = glac_plot, device = "pdf", width = 22, height = 6)
+}
+
+
 if (plot_RCP_groups) {
   # Temperature
   plot_temperature_by_chain(processed_data_list, "RCP85")
@@ -257,5 +358,8 @@ if (plot_RCP_groups) {
   plot_precipitation_by_chain(processed_data_list, "RCP85")
   plot_precipitation_by_chain(processed_data_list, "RCP45")
   plot_precipitation_by_chain(processed_data_list, "RCP26")
+  
+  # Glacier extent
+  plot_mean_glacier_area(processed_data_list)
 }
 

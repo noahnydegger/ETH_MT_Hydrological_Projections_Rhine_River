@@ -24,7 +24,7 @@ source(here("R_scripts", "data_import_functions.R"))
 
 mit_knmi_list <- list()
 
-# import the .mit and .pri files for each scenario, ensemble, and area
+# import the .mit file for each scenario, ensemble, and area
 for (scen in scenarios) {
   mit_knmi_list[[scen]] <- list()
   for (ens in ensenmbles) {
@@ -32,28 +32,20 @@ for (scen in scenarios) {
     for (geb in gebiete) {
       # Construct the file path
       mit_file <- file.path(here::here(), data_dir, paste0(scen, "_", ens), geb, paste0(geb, ".mit"))
-      pri_file <- file.path(here::here(), data_dir, paste0(scen, "_", ens), geb, paste0(geb, ".pri"))
       
-      # Check if the mit and pri files exist before reading
-      if (file.exists(mit_file) && file.exists(pri_file)) {
+      # Check if the mit file exists before reading
+      if (file.exists(mit_file)) {
         
         # Import data from the .mit and .pri files
         mit_data <- import_mit_data(mit_file)
-        pri_data <- import_pri_data(pri_file)
         
         # Store the loaded data in the list
         mit_knmi_list[[scen]][[ens]][[geb]][["daily"]] <- mit_data
-        mit_knmi_list[[scen]][[ens]][[geb]][["monthly"]] <- pri_data$monthly
-        mit_knmi_list[[scen]][[ens]][[geb]][["yearly"]] <- pri_data$yearly
+        mit_knmi_list[[scen]][[ens]][[geb]][["monthly"]] <- compute_monthly_means(mit_data)
+        mit_knmi_list[[scen]][[ens]][[geb]][["yearly"]] <- compute_yearly_means(mit_data)
         
       } else {
-        # Handle missing file case
-        if (!file.exists(mit_file)) {
-          message(paste("Mit file not found:", mit_file))
-        }
-        if (!file.exists(pri_file)) {
-          message(paste("Pri file not found:", pri_file))
-        }
+        message(paste("Mit file not found:", mit_file))
         mit_knmi_list[[scen]][[ens]][[geb]] <- NULL
       }
     }
@@ -61,11 +53,9 @@ for (scen in scenarios) {
 }
 
 # compute the ensemble statistics (mean, std, max, min) for each scenario, area, and time scale
-scenario_names <- c(
-  "reference", "Hd_2100"
-)
 
-for (scenario in scenario_names) {
+for (scenario in scenarios) {
+  cat("Scenario processing started:", scenario, "\n")
   # Select only ensemble members (ens1, ens2, ens3, etc.), not ensMean, ensStd, etc.
   ensemble_members <- grep("^ens[0-9]+$", names(mit_knmi_list[[scenario]]), value = TRUE)
   
@@ -152,10 +142,8 @@ for (scenario in scenario_names) {
         mit_knmi_list[[scenario]][[stat_name]][[area]][[time_scale]] <- stat_df
       }
       
-      # Print message indicating completion
-      cat("Finished processing:", area, "for", time_scale, "\n")
-      
     } # time_scale loop
+    cat("Finished processing:", scenario, area, "\n")
   } # area loop
   
   cat("Scenario processing completed:", scenario, "\n")

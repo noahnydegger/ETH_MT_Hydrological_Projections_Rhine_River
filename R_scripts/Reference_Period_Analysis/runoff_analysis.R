@@ -66,7 +66,7 @@ seasonal_indicators <- function(data) {
     mutate(
       Season = case_when(
         MM %in% c(5, 6, 7, 8, 9, 10) ~ "S",
-        MM %in% c(11, 12, 1, 2, 3, 4b) ~ "W",
+        MM %in% c(11, 12, 1, 2, 3, 4) ~ "W",
         TRUE ~ "Other"
       )
     ) %>%
@@ -169,16 +169,25 @@ plot_annual_indicators_boxplots <- function(data, indicator, stat, y_label) {
       y = paste(y_label, unit),
       fill = "Dataset"
     ) +
-    theme_minimal() +
-    theme(axis.title.x = element_blank()) +  # Remove the x-axis title
-    scale_fill_brewer(palette = "Set1")
+    theme_minimal(base_size = 16) +  
+    theme(
+      text = element_text(color = "black"),  # Make all text black
+      axis.title.x = element_blank(),
+      axis.text = element_text(size = 14, color = "black"),  
+      axis.title = element_text(size = 16, face = "bold", color = "black"),  
+      legend.text = element_text(size = 14, color = "black"),  
+      legend.title = element_text(size = 16, face = "bold", color = "black"),  
+      plot.title = element_text(size = 18, face = "bold", hjust = 0.5, color = "black")  
+    ) +
+    scale_fill_manual(values = c("STAN" = "grey10", "KNMI" = "grey60"), drop = FALSE) +
+    scale_color_manual(values = c("STAN" = "black", "KNMI" = "grey60"), drop = FALSE)
   
   # save the plot as a pdf file
   save_dir <- file.path(here::here(), "Plots", gebiet, y_label)
   if (!dir.exists(save_dir)) {
     dir.create(save_dir, recursive = TRUE)
   }
-  ggsave(file.path(save_dir, paste0("Annual_",indicator, ".pdf")), plot = p, device = "pdf", width = 12, height = 6)
+  ggsave(file.path(save_dir, paste0("Annual_",indicator, ".pdf")), plot = p, device = "pdf", width = 8, height = 6)
 }
 
 plot_seasonal_indicators_boxplots <- function(data, indicator, stat, y_label) {
@@ -193,8 +202,17 @@ plot_seasonal_indicators_boxplots <- function(data, indicator, stat, y_label) {
       y = paste(y_label, unit),
       fill = "Dataset"
     ) +
-    theme_minimal() +
-    scale_fill_brewer(palette = "Set1")
+    theme_minimal(base_size = 16) +  
+    theme(
+      text = element_text(color = "black"),  # Make all text black
+      axis.text = element_text(size = 14, color = "black"),  
+      axis.title = element_text(size = 16, face = "bold", color = "black"),  
+      legend.text = element_text(size = 14, color = "black"),  
+      legend.title = element_text(size = 16, face = "bold", color = "black"),  
+      plot.title = element_text(size = 18, face = "bold", hjust = 0.5, color = "black")  
+    ) +
+    scale_fill_manual(values = c("STAN" = "grey10", "KNMI" = "grey60")) +
+    scale_color_manual(values = c("STAN" = "black", "KNMI" = "grey60"))
   
   # Save the plot as a PDF file
   save_dir <- file.path(here::here(), "Plots", gebiet, y_label)
@@ -214,8 +232,8 @@ plot_seasonal_indicators_boxplots(combined_seasons, "MH7S", "Highest 7-day","Sno
 plot_seasonal_indicators_boxplots(combined_seasons, "MG", "Mean","Ice melt")
 plot_seasonal_indicators_boxplots(combined_seasons, "MN7G", "Lowest 7-day","Ice melt")
 plot_seasonal_indicators_boxplots(combined_seasons, "MH7G", "Highest 7-day","Ice melt")
-
-plot_annual_indicators_boxplots(combined_years, "MQ", "Mean","Runoff")
+# 
+ plot_annual_indicators_boxplots(combined_years, "MQ", "Mean","Runoff")
 plot_annual_indicators_boxplots(combined_years, "MNQ", "Lowest","Runoff")
 plot_annual_indicators_boxplots(combined_years, "MHQ", "Highest","Runoff")
 plot_annual_indicators_boxplots(combined_years, "MS", "Mean","Snow melt")

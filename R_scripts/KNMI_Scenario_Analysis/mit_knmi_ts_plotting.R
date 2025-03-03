@@ -2,6 +2,11 @@ library(dplyr)
 library(purrr)
 library(slider)
 
+# Define the list of scenarios
+scenario_list <- c("reference", "Hd_2100")
+
+area <- "ThS200"
+
 # Function to compute daily statistics for multiple scenarios
 compute_runoff_statistics_scenarios <- function(mit_knmi_list, area, column_name, scenario_list) {
   # Initialize a list to store results for each scenario
@@ -46,8 +51,8 @@ compute_runoff_statistics_scenarios <- function(mit_knmi_list, area, column_name
       group_by(DayOfYear) %>%
       summarise(
         Mean = mean(RM, na.rm = TRUE),
-        Q10 = quantile(RM, 0.10, na.rm = TRUE),
-        Q90 = quantile(RM, 0.90, na.rm = TRUE)
+        Q10 = quantile(RM, 0.25, na.rm = TRUE),
+        Q90 = quantile(RM, 0.75, na.rm = TRUE)
       ) %>%
       filter(!is.na(Mean) | !is.na(Q10) | !is.na(Q90))  # Remove rows with NA values across all metrics
     
@@ -78,24 +83,42 @@ plot_runoff_statistics <- function(scenario_stats_list, y_label, variable) {
     mutate(DateLabel = as.Date(DayOfYear - 1, origin = "2023-01-01"),
            Scenario = factor(Scenario, levels = c("reference", "Hd_2100")))  # Ensure reference is first
   
-  # Create breaks for the start of each month
-  month_breaks <- seq(as.Date("2023-01-15"), as.Date("2023-12-15"), by = "1 month")
+  # Create breaks for the start of each month (gridlines)
+  month_lines <- seq(as.Date("2023-01-01"), as.Date("2023-12-01"), by = "1 month")
+  
+  # Create breaks for month labels (placed on the 15th)
+  month_labels <- seq(as.Date("2023-01-15"), as.Date("2023-12-15"), by = "1 month")
   
   ggplot(combined_stats, aes(x = DateLabel, group = Scenario, color = Scenario)) +
+    # Add background gridlines at the 1st of each month
+    geom_vline(xintercept = as.numeric(month_lines), color = "gray90") +
     geom_ribbon(aes(ymin = !!sym(q10col), ymax = !!sym(q90col), fill = Scenario), alpha = 0.4) +
     geom_line(aes(y = !!sym(meancol)), size = 1) +
     scale_x_date(
       date_labels = "%b",
-      breaks = month_breaks
+      breaks = month_labels,
+      expand = c(0, 0)  # Remove empty space before Jan 1 and after Dec 31
     ) +
     labs(
-      title = paste("30-day Moving Average (with Q10-Q90) of daily mean", y_label),
+      title = paste("30-day Moving Average", y_label, "(with Q25-Q75)", "in subbasin ThS200"),
       x = "Month",
-      y = paste(y_label, "[mm/day]"),
+      y = paste(y_label, "[mm/d]"),
       color = "Scenario",
       fill = "Scenario"
     ) +
-    theme_minimal() +
+    theme_minimal(base_size = 14) +
+    theme(
+      panel.grid.major.x = element_blank(),  # Remove automatic gridlines
+      panel.grid.major.y = element_line(color = "gray90"),  # Solid horizontal gridlines
+      panel.grid.minor = element_blank(),  # Remove minor gridlines
+      text = element_text(color = "black"),  # Make all text black
+      axis.title.x = element_blank(),
+      axis.text = element_text(size = 14, color = "black"),  
+      axis.title = element_text(size = 16, face = "bold", color = "black"),  
+      legend.text = element_text(size = 14, color = "black"),  
+      legend.title = element_text(size = 16, face = "bold", color = "black"),  
+      plot.title = element_text(size = 18, face = "bold", hjust = 0.5, color = "black")  
+    ) +
     # Manually set colors and fills for scenarios
     scale_color_manual(values = scenario_colors) +
     scale_fill_manual(values = scenario_colors)
@@ -105,14 +128,11 @@ plot_runoff_statistics <- function(scenario_stats_list, y_label, variable) {
   if (!dir.exists(save_dir)) {
     dir.create(save_dir, recursive = TRUE, showWarnings = FALSE)
   }
-  ggsave(file.path(save_dir, paste0("TS_", y_label, ".pdf")), plot = last_plot(), device = "pdf", width = 12, height = 6)
+  ggsave(file.path(save_dir, paste0("TS_", y_label, ".pdf")), plot = last_plot(), device = "pdf", width = 18, height = 6)
 }
 
-# Define the list of scenarios
-scenario_list <- c("reference", "Hd_2100")
-
 # Compute daily statistics for all ensembles for each scenario
-scenario_stats_list <- compute_runoff_statistics_scenarios(mit_knmi_list, area = "ThS200", column_name = "RGES", scenario_list = scenario_list)
+scenario_stats_list <- compute_runoff_statistics_scenarios(mit_knmi_list, area, column_name = "RGES", scenario_list = scenario_list)
 
 # Call the plot function with the computed statistics
 plot_runoff_statistics(scenario_stats_list, y_label = "Runoff", variable = "RGES")

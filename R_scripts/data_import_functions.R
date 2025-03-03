@@ -17,43 +17,18 @@ import_mit_data <- function(file_path) {
   return(mit_data)
 }
 
-import_pri_data <- function(file_path) {
-  # Define column names according to metadata
-  column_names <- c("BASINID", "YYYY", "MM", "BASINID_DUP", "P", "ADJ_P", "SWA", "ETP", "ETR", 
-                    "EI", "EB", "R0", "R1", "R2", "RTOT", "SSO", "SI", "SSM", "SUZ", "SLZ", "ICEM")
+import_stats_data <- function(file_path) {
   # Load the data from the file
-  pri_data <- read.table(file_path, header = FALSE, fill = TRUE)
+  stats_data <- read.table(file_path, header = TRUE)
   
-  # Remove rows where the month (MM) or year (YYYY) are 0 or negative
-  pri_data <- pri_data %>% 
-    filter(V3 >= 0, V3 <= 12, V2 > 0)
-  
-  # Assign column names after filtering
-  colnames(pri_data) <- column_names
-  
-  # Ensure year (YYYY) and month (MM) are treated as numeric
-  pri_data <- pri_data %>% mutate(YYYY = as.numeric(YYYY), MM = as.numeric(MM))
-  
-  # Extract the horizon from the file
+  # Extract the horizon from the file)
   horizon <- extract_horizon(file_path)
   
-  # select 30 year period
-  pri_data <- filter(pri_data, YYYY >= (horizon - 14), YYYY <= (horizon + 15))
+  # Process the data
+  stats_data <- process_data(stats_data, min_year = horizon - 14, max_year = horizon + 15)
   
-  # Separate monthly and yearly data
-  monthly_data <- pri_data %>% 
-    filter(MM != 0) %>%   # Exclude yearly summary rows
-    mutate(YearMonth = paste(YYYY, sprintf("%02d", MM), sep = "-")) %>%  # Create Year-Month column
-    select(-BASINID_DUP, -BASINID)  # Remove redundant ID columns
-  
-  yearly_data <- pri_data %>%
-    filter(MM == 0) %>%   # Select only yearly summary rows
-    select(-c(MM, BASINID, BASINID_DUP))  # Remove MM (since it's always 0) and ID columns
-  
-  # Return the processed datasets as a list
-  return(list(monthly = monthly_data, yearly = yearly_data))
+  return(stats_data)
 }
-
 
 extract_horizon <- function(file_path) {
   # Extract the scenario_ensemble folder (two levels up from the file)
@@ -94,5 +69,25 @@ process_data <- function(data, min_year = NULL, max_year = NULL) {
   return(data)
 }
 
+
+compute_monthly_means <- function(mit_data) {
+  # Compute monthly means for each column
+  monthly_means <- mit_data %>%
+    select(-c(DD)) %>%
+    group_by(YearMonth) %>%
+    summarize(across(where(is.numeric), \(x) mean(x, na.rm = TRUE)))
+  
+  return(monthly_means)
+}
+
+compute_yearly_means <- function(mit_data) {
+  # Compute yearly means for each column
+  yearly_means <- mit_data %>%
+    select(-c(DD, MM)) %>%
+    group_by(YYYY) %>%
+    summarize(across(where(is.numeric), \(x) mean(x, na.rm = TRUE)))
+  
+  return(yearly_means)
+}
 
 

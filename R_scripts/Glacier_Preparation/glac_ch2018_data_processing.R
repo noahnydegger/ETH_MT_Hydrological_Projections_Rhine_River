@@ -6,6 +6,10 @@ library(here)
 period_lenght <- 10
 gebiet <- "ThS"
 
+meteo_variables <- c("temp", "prec", "rad_")
+
+source(here("R_scripts", "Glacier_Preparation", "swisscors2lonlat.R"))
+
 chains_vs_glac_file <- "chains_vs_glac_ch2018.dat"
 
 data_path <- file.path(here::here(), "Data", gebiet)
@@ -208,19 +212,77 @@ process_file <- function(meteo_dir, glac_dir) {
 
 chain_glchain_df <- parse_chains_glchains(chains_dir)
 
-# Use apply to loop over each row of chain_glchain_df (ignoring the header row)
-processed_data_list <- apply(chain_glchain_df, 1, function(row) {
-  # Construct the folder paths
-  meteo_dir <- file.path(data_path, "meteoThS", paste0(row['chain'], "_g73"), "ThS200")
-  glac_dir <- file.path(data_path, "ThSGlac", row['glchain'])
-  
-  # Process the files in the directories
-  data <- process_file(meteo_dir, glac_dir)
-  
-  return(data)  # Return the processed data for this row
-})
+ch2018_meteo_glac_list <- list()
 
-# The result will be a list with the chain names as list names
-names(processed_data_list) <- chain_glchain_df$chain  # Use the chain column as the names for the list
+for (i in seq_len(nrow(chain_glchain_df))) {
+  chain <- chain_glchain_df$chain[i]
+  glchain <- chain_glchain_df$glchain[i]
+  
+  ch2018_meteo_glac_list[[chain]] <- list()
+  
+  for (var in meteo_variables) {
+    meteo_file <- file.path(data_path, "meteoThS", paste0(chain, "_g73"), "ThS200", paste0(var, "_full.stats"))
+    glac_dir <- file.path(data_path, "ThSGlac", glchain)
+    
+    # Check if the meteo file exists before reading
+    if (file.exists(meteo_file)) {
+      
+      # Read the data from the file
+      meteo_data <- read.table(meteo_file, header = TRUE)
+      
+      # Filter rows before 1981 (warmup period)
+      meteo_data <- meteo_data %>% 
+        mutate(Date = as.Date(paste(meteo_data$YYYY, meteo_data$MM, meteo_data$DD, sep = "-"), format = "%Y-%m-%d")) %>%
+        filter(YYYY >= 1981) %>%
+        mutate(YearMonth = format(Date, "%Y-%m"))
+      
+      # Store the loaded data in the list
+      ch2018_meteo_glac_list[[chain]][[var]][["daily"]] <- meteo_data
+      ch2018_meteo_glac_list[[chain]][[var]][["monthly"]] <- compute_monthly_means(meteo_data)
+      ch2018_meteo_glac_list[[chain]][[var]][["yearly"]] <- compute_yearly_means(meteo_data)
+      
+      # compute stats
+      monthly_df <- ch2018_meteo_glac_list[[chain]][[var]][["monthly"]]
+      
+      # Ensure YearMonth is in Date format for proper ordering
+      monthly_df$YearMonth <- as.Date(paste0(monthly_df$YearMonth, "-01"), format = "%Y-%m-%d")  # Convert YYYYMM to Date
+      
+      # Compute 10-year running average (using a 120-month window)
+      rolling_mean_df <- as.data.frame(lapply(monthly_df[, -1], function(x) {
+        rollapply(x, width = 12 * period_lenght, FUN = mean, align = "center", fill = NA, na.rm = TRUE)
+      }))
+      
+      # Add back the time column for proper visualization
+      rolling_mean_df$YearMonth <- monthly_df$YearMonth
+      
+      # Store results in the list structure
+      ch2018_meteo_glac_list[[chain]][[var]][["rolling_mean_10yr"]] <- rolling_mean_df
+      
+    } else {
+      message(paste("Meteo file not found:", meteo_file))
+      ch2018_meteo_glac_list[[chain]][[var]] <- NULL
+    }
+    
+  } # meteo var loop
+  glac_data <- process_all_Glac_files(glac_dir)
+  
+  ch2018_meteo_glac_list[[chain]][["glchain"]] <- glchain
+  ch2018_meteo_glac_list[[chain]][["glac_data"]] <- glac_data
+}
+
+# # Use apply to loop over each row of chain_glchain_df (ignoring the header row)
+# processed_data_list <- apply(chain_glchain_df, 1, function(row) {
+#   # Construct the folder paths
+#   meteo_dir <- file.path(data_path, "meteoThS", paste0(row['chain'], "_g73"), "ThS200")
+#   glac_dir <- file.path(data_path, "ThSGlac", row['glchain'])
+#   
+#   # Process the files in the directories
+#   data <- process_file(meteo_dir, glac_dir)
+#   
+#   return(data)  # Return the processed data for this row
+# })
+# 
+# # The result will be a list with the chain names as list names
+# names(processed_data_list) <- chain_glchain_df$chain  # Use the chain column as the names for the list
 
 # Now, processed_data_list will contain data for each chain (with key as the chain name)

@@ -296,7 +296,7 @@ plot_mean_glacier_area <- function(processed_data_list) {
   # Plot past data (black dashed lines)
   glac_plot <- glac_plot +
     geom_line(data = data_before_2015, aes(x = YYYY, y = mean_glac, linetype = DataType), 
-              color = "black", size = 1)
+              color = "black", size = 2)
   
   # Define colors for RCP scenarios
   rcp_colors <- c("RCP26" = "blue", "RCP45" = "orange", "RCP85" = "red")
@@ -307,7 +307,7 @@ plot_mean_glacier_area <- function(processed_data_list) {
     glac_plot <- glac_plot +
       geom_line(data = mean_glacier_data_after_2015[[rcp]], 
                 aes(x = YYYY, y = mean_glac, color = RCP, linetype = DataType), 
-                size = 1)
+                size = 2)
   }
   
   # Finalize the plot with proper legend

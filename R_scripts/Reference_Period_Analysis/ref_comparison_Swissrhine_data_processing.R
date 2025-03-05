@@ -74,6 +74,67 @@ for (scen in scenarios) {
       ref_rhine_list[[scen]][[ens]] <- NULL
     }
   }
+  time_scale_names <- c("monthly", "yearly")# c("daily", "monthly", "yearly")
+  for (time_scale in time_scale_names) {
+    # Extract data frame for the first ensemble member for the given area and time scale
+    first_df <- ref_rhine_list[[scenario]][[ensenmbles[1]]][[time_scale]]
+    
+    if (is.null(first_df)) next  # Skip if time scale doesn't exist
+    
+    # Extract the correct time column based on time scale
+    if (time_scale == "monthly") {
+      times <- first_df$YearMonth
+    } else if (time_scale == "yearly") {
+      times <- first_df$YYYY
+    } 
+    
+    # Initialize the list to store statistics (Mean, Std, Max, Min) of all ensembles
+    stat_list <- list(ensMean = list(), ensStd = list(), ensMax = list(), ensMin = list())
+    
+    # Extract unique times (dates, YearMonth or YYYY)
+    unique_times <- unique(times)
+    
+    # Loop over each unique time group (date, YearMonth, year)
+    for (time_id in seq_along(unique_times)) {
+      time_filter <- unique_times[time_id]
+      
+      # Filter the data based on time_scale and time_filter
+      filtered_data <- do.call(rbind, lapply(ensenmbles, function(ens) {
+        data <- ref_rhine_list[[scenario]][[ens]][[time_scale]]
+        if (time_scale == "monthly") {
+          data <- data[data$YearMonth == time_filter, , drop = FALSE]  # Monthly data remains unchanged
+        } else if (time_scale == "yearly") {
+          data <- data[data$YYYY == time_filter, , drop = FALSE]
+          data <- data[, !colnames(data) %in% c("YYYY"), drop = FALSE]  # Remove YYYY
+        }
+      }))
+      
+      # Compute statistics for each column, excluding the time column
+      numeric_data <- filtered_data[, sapply(filtered_data, is.numeric)]  # Only select numeric columns
+      
+      # Compute statistics for each column
+      stat_list$ensMean[[time_id]] <- colMeans(numeric_data, na.rm = TRUE)
+      stat_list$ensStd[[time_id]]  <- apply(numeric_data, 2, sd, na.rm = TRUE)
+      stat_list$ensMax[[time_id]]  <- apply(numeric_data, 2, max, na.rm = TRUE)
+      stat_list$ensMin[[time_id]]  <- apply(numeric_data, 2, min, na.rm = TRUE)
+    }
+    
+    # Convert lists into data frames and store in the correct list structure
+    for (stat_name in names(stat_list)) {
+      stat_df <- do.call(rbind, stat_list[[stat_name]])
+      
+      # Add the correct time column (Year or Year-Month) to the data frame
+      if (time_scale == "yearly") {
+        stat_df <- data.frame(YYYY = unique_times, stat_df, row.names = NULL)
+      } else {
+        stat_df <- data.frame(YearMonth = unique_times, stat_df, row.names = NULL)
+      }
+      
+      # Store the computed statistics in the correct location
+      ref_rhine_list[[scenario]][[stat_name]][[time_scale]] <- stat_df
+    }
+    
+  } # time_scale loop
 }
 
 # import hindcast data
@@ -315,6 +376,65 @@ plot_runoff_statistics <- function(scenario_stats_list, y_label, variable, q_bot
   ggsave(file.path(save_dir, filename), plot = p, device = "pdf", width = 18, height = 6)
 }
 
+plot_annual_boxplots <- function(ref_rhine_list, scenarios, geb, c_name, stat, y_label, unit) {
+  
+  # Initialize a list to store yearly data
+  yearly_list <- list()
+  
+  for (scenario in scenarios) {
+    # Select only the reference ensemble mean and hindcast scenario
+    if (scenario == "reference") {
+      yearly_data <- ref_rhine_list[[scenario]][["ensMean"]][["yearly"]]
+      
+    } else {
+      yearly_data <- ref_rhine_list[[scenario]][["yearly"]]
+    }
+    
+    yearly_data <- yearly_data %>%
+      select(YYYY, all_of(c_name)) %>%
+      mutate(Scenario = scenario)  # Add Scenario column
+    
+    yearly_list[[length(yearly_list) + 1]] <- yearly_data
+  }
+  
+  # Combine extracted data
+  yearly_df <- do.call(rbind, yearly_list)
+  
+  # Ensure Scenario is a factor with correct order
+  yearly_df$Scenario <- factor(yearly_df$Scenario, levels = c("observed", "hindcast", "reference"))
+  
+  # Plot annual boxplots
+  p <- ggplot(yearly_df, aes(x = Scenario, y = .data[[c_name]], fill = Scenario)) +
+    geom_boxplot(position = position_dodge(width = 0.8), fatten = 2, size = 0.8) +  
+    labs(
+      title = paste("Annual", stat, y_label),
+      x = "Dataset",
+      y = paste(y_label, unit),
+      fill = "Dataset"
+    ) +
+    theme_minimal(base_size = 16) +  
+    theme(
+      text = element_text(color = "black"),
+      axis.title.x = element_blank(),
+      axis.text = element_text(size = 14, color = "black"),  
+      axis.title = element_text(size = 16, face = "bold", color = "black"),  
+      legend.text = element_text(size = 14, color = "black"),  
+      legend.title = element_text(size = 16, face = "bold"),  
+      plot.title = element_text(size = 18, face = "bold", hjust = 0.5, color = "black"),
+      panel.grid.major.x = element_blank(),  # Remove vertical gridlines
+      panel.grid.minor.x = element_blank()   # Remove minor vertical gridlines  
+    ) +
+    scale_fill_manual(values = ref_colors, labels = ref_labels) +
+    scale_x_discrete(labels = NULL)  # Remove x-axis labels (only the legend will show)
+  
+  # save the plot as a pdf file
+  save_dir <- file.path(here::here(), "Plots","Reference_Period_Analysis", "Boxplots")
+  if (!dir.exists(save_dir)) {
+    dir.create(save_dir, recursive = TRUE, showWarnings = FALSE)
+  }
+  ggsave(file.path(save_dir, paste0(geb,"_", y_label, "_annual.pdf")), plot = p, device = "pdf", width = 8, height = 6)
+}
+
 # Define the list of scenarios
 scenario_list <- c("reference", "hindcast", "observed")
 
@@ -322,6 +442,8 @@ scenario_list <- c("reference", "hindcast", "observed")
 scenario_stats_list <- compute_runoff_statistics_scenarios(ref_rhine_list, "Rhine Basel", column_name = "rhinebasel", scenarios = scenario_list)
 
 # Call the plot function with the computed statistics
-plot_runoff_statistics(scenario_stats_list, y_label = "Discharge", variable = "rhinebasel", show_ensemble = TRUE, show_range = FALSE)
-plot_runoff_statistics(scenario_stats_list, y_label = "Discharge", variable = "rhinebasel", show_ensemble = FALSE, show_range = FALSE)
-plot_runoff_statistics(scenario_stats_list, y_label = "Discharge", variable = "rhinebasel", show_ensemble = FALSE, show_range = TRUE)
+plot_annual_boxplots(ref_rhine_list, scenario_list, "RhineBasel", "rhinebasel", "Mean", "Discharge", "[m³/s]")
+
+# plot_runoff_statistics(scenario_stats_list, y_label = "Discharge", variable = "rhinebasel", show_ensemble = TRUE, show_range = FALSE)
+# plot_runoff_statistics(scenario_stats_list, y_label = "Discharge", variable = "rhinebasel", show_ensemble = FALSE, show_range = FALSE)
+# plot_runoff_statistics(scenario_stats_list, y_label = "Discharge", variable = "rhinebasel", show_ensemble = FALSE, show_range = TRUE)

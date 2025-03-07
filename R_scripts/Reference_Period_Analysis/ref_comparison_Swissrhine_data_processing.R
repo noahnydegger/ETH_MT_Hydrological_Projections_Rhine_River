@@ -355,7 +355,6 @@ plot_runoff_statistics <- function(scenario_stats_list, y_label, variable, q_bot
       legend.title = element_text(size = 16, face = "bold", color = "black"),  
       plot.title = element_text(size = 18, face = "bold", hjust = 0.5, color = "black")  
     ) +
-    ylim(750, 1750) +
     scale_color_manual(
       values = ref_colors,
       labels = c("observed" = "Observed", "hindcast" = "Hindcast", "reference" = "KNMI Mean", 
@@ -365,7 +364,7 @@ plot_runoff_statistics <- function(scenario_stats_list, y_label, variable, q_bot
       values = ref_colors,
       labels = c("observed" = "Observed", "hindcast" = "Hindcast", "reference" = "KNMI", 
                  "KNMI Ensembles" = "KNMI ens")  # Change legend labels
-    ) else NULL 
+    ) else ylim(750, 1750) 
   
   # Save the plot as a PDF file
   save_dir <- file.path(here::here(), "Plots", "Reference_Period_Analysis", "TimeSeries")
@@ -444,6 +443,6 @@ scenario_stats_list <- compute_runoff_statistics_scenarios(ref_rhine_list, "Rhin
 # Call the plot function with the computed statistics
 plot_annual_boxplots(ref_rhine_list, scenario_list, "RhineBasel", "rhinebasel", "Mean", "Discharge", "[m³/s]")
 
-# plot_runoff_statistics(scenario_stats_list, y_label = "Discharge", variable = "rhinebasel", show_ensemble = TRUE, show_range = FALSE)
-# plot_runoff_statistics(scenario_stats_list, y_label = "Discharge", variable = "rhinebasel", show_ensemble = FALSE, show_range = FALSE)
-# plot_runoff_statistics(scenario_stats_list, y_label = "Discharge", variable = "rhinebasel", show_ensemble = FALSE, show_range = TRUE)
+ plot_runoff_statistics(scenario_stats_list, y_label = "Discharge", variable = "rhinebasel", show_ensemble = TRUE, show_range = FALSE)
+ plot_runoff_statistics(scenario_stats_list, y_label = "Discharge", variable = "rhinebasel", show_ensemble = FALSE, show_range = FALSE)
+ plot_runoff_statistics(scenario_stats_list, y_label = "Discharge", variable = "rhinebasel", show_ensemble = FALSE, show_range = TRUE)

@@ -21,8 +21,8 @@ ref_labels <- c("observed" = "Observed", "hindcast" = "Hindcast", "reference" = 
 gebiete <- c("RhB200")
 
 
-c_names <- c("RGES", "P_uk", "P_SME", "GLAC")
-y_labels <- c("RGES" = "Runoff", "P_uk" = "Precipitation", "P_SME" = "Snowmelt", "GLAC" = "Icemelt")
+c_names <- c("RGES", "P_uk", "P_SME", "GLAC", "EREA")
+y_labels <- c("RGES" = "Runoff", "P_uk" = "Precipitation", "P_SME" = "Snowmelt", "GLAC" = "Icemelt", "EREA" = "actual Evapotranspiration")
 stats <- c("Mean")
 
 plot_monthly_with_yearly_boxplots <- function(ref_mit_list, scenarios, geb, c_name, stat, y_label, unit) {

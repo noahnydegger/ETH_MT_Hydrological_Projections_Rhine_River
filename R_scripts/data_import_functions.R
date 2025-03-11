@@ -2,11 +2,12 @@
 library(tidyverse)
 library(ggplot2)
 library(dplyr)
+library(data.table)
 library(here)
 
 import_mit_data <- function(file_path) {
   # Load the data from the file
-  mit_data <- read.table(file_path, header = TRUE, skip = 1)
+  mit_data <- fread(file_path, skip = 1)
   
   # Extract the horizon from the file)
   horizon <- extract_horizon(file_path)
@@ -19,7 +20,7 @@ import_mit_data <- function(file_path) {
 
 import_stats_data <- function(file_path) {
   # Load the data from the file
-  stats_data <- read.table(file_path, header = TRUE)
+  stats_data <- fread(file_path)
   
   # Extract the horizon from the file)
   horizon <- extract_horizon(file_path)
@@ -48,21 +49,24 @@ extract_horizon <- function(file_path) {
 
 # Function to process data: combine date columns and filter by year range
 process_data <- function(data, min_year = NULL, max_year = NULL) {
+  # Ensure data is a data.table
+  setDT(data)
+  
   # Combine date columns into a Date object
-  data$Date <- as.Date(paste(data$YYYY, data$MM, data$DD, sep = "-"), format = "%Y-%m-%d")
+  data[, date := as.Date(paste(YYYY, MM, DD, sep = "-"), format = "%Y-%m-%d")]
   
   # Replace '.' with '_' in column names
-  colnames(data) <- gsub("\\.", "_", colnames(data))
+  setnames(data, gsub("\\.", "_", names(data)))
   
   # Create a YearMonth column in "YYYY-MM" format
-  data <- data %>% mutate(YearMonth = format(Date, "%Y-%m"))
+  data[, YearMonth := format(date, "%Y-%m")]
   
-  # Filter rows between 30 year periods
+  # Filter rows between 30-year periods
   if (!is.null(min_year)) {
-    data <- subset(data, format(Date, "%Y") >= min_year)
+    data <- data[year(date) >= min_year]  # data.table's fast filtering
   }
   if (!is.null(max_year)) {
-    data <- subset(data, format(Date, "%Y") <= max_year)
+    data <- data[year(date) <= max_year]
   }
   
   # Return processed data

@@ -5,8 +5,10 @@ home_dir <- file.path(here::here())
 input_dir <- file.path(home_dir, "Data", "Rheinblick2027", "raw_prevah_output", "routing")
 output_dir <- file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output")
 
-file_prefix <- "Swissrhine200_"
-file_suffix <- ".dat"
+input_file_prefix <- "Swissrhine200_"
+input_file_suffix <- ".dat"
+
+output_file_name <- "prevah_discharge_knmi"
 
 column_names_prevah <- c("YYYY", "MM", "DD", "Rekingen", "Untersiggenthal", "Rheinfelden", "Basel", "Wiese")
 
@@ -78,7 +80,7 @@ for (geb in gebiete) {
         member <- as.numeric(sub(".*_ens([1-8])$", "\\1", basename(ens_folder)))
         
         # Define the expected file path inside the subfolder (adjust filename if needed)
-        data_file <- file.path(ens_folder, paste0(file_prefix, basename(ens_folder), file_suffix))  # Adjust filename if needed
+        data_file <- file.path(ens_folder, paste0(input_file_prefix, basename(ens_folder), input_file_suffix))  # Adjust filename if needed
         
         # Check if the file exists before reading
         if (file.exists(data_file)) {
@@ -130,9 +132,9 @@ if (!dir.exists(output_dir)) {
 }
 
 # Export to CSV
-write.csv2(combined_data, file.path(output_dir, "prevah_discharge.csv"), row.names = FALSE, quote = FALSE)
+write.csv2(combined_data, file.path(output_dir, paste0(output_file_name, ".csv")), row.names = FALSE, quote = FALSE)
 
 # Export to .RDS format
-saveRDS(combined_data, file.path(output_dir, "prevah_discharge.rds"))
+saveRDS(combined_data, file.path(output_dir, paste0(output_file_name, ".rds")))
         
         

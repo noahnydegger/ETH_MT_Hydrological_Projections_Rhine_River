@@ -5,7 +5,7 @@ library(here)
 
 period_lenght <- 10 # years for running average
 
-gebiet <- c("ThS_200")
+gebiete <- c("ThS200")
 
 # Define the variables to process
 meteo_variables <- c("tair", "prec", "radg")
@@ -123,17 +123,17 @@ for (scen in scenarios) {
         
       } # time_scale loop
       # Extract the monthly ensemble mean data
-      ensMean_df <- knmi_meteo_list[[scen]][["ensMean"]][[geb]][[var]][["monthly"]]
+      ensMean_df <- knmi_meteo_list[[scen]][["ensMean"]][[geb]][[var]][["yearly"]]
       
       # Ensure YearMonth is in Date format for proper ordering
-      ensMean_df$YearMonth <- as.Date(paste0(ensMean_df$YearMonth, "-01"), format = "%Y-%m-%d")  # Convert YYYYMM to Date
+      ensMean_df$YYYY <- as.Date(paste0(ensMean_df$YYYY, "-01-01"), format = "%Y-%m-%d")  # Convert YYYY to Date
       
       # Compute the overall mean for the 30-year period
       overall_mean_df <- colMeans(ensMean_df[, -1], na.rm = TRUE)  # Exclude YearMonth column
       
-      # Compute 10-year running average (using a 120-month window)
+      # Compute 10-year running average
       rolling_mean_df <- as.data.frame(lapply(ensMean_df[, -1], function(x) {
-        rollapply(x, width = 12 * period_lenght, FUN = mean, align = "center", fill = NA, na.rm = TRUE)
+        rollapply(x, width = period_lenght, FUN = mean, align = "center", fill = NA, na.rm = TRUE)
       }))
       
       # Add back the time column for proper visualization

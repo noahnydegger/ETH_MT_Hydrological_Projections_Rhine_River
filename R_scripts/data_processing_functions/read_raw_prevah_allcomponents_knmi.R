@@ -24,7 +24,8 @@ ensenmbles <- c(
   "ens1", "ens2", "ens3", "ens4", "ens5", "ens6", "ens7", "ens8"
 )
 
-meteo_variables <- c("tair", "prec", "radg", "sund", "rhum", "wspd")
+meteo_variables <- c(
+  "tair", "prec", "radg", "sund", "rhum", "wspd")
 
 no_meteo_gebiete <- c(
   "RhB200", "RhD200", "RhN200", "RhR200"
@@ -48,6 +49,10 @@ if (dir.exists(geb_path)) {
 # import the .mit file for each scenario, ensemble, and area
 for (scen in scenario_horizons) {
   
+  # Skip if `scen` is not found in any scenario-horizon folder
+  matching_folders <- grep(scen, scen_hor_folders, value = TRUE)
+  if (length(matching_folders) == 0) next
+  
   if (scen == "reference") {
     scenario <- "R"
     horizon <- 2005
@@ -58,10 +63,6 @@ for (scen in scenario_horizons) {
   
   # Extract `variant` (2nd character of scenario, "d", "n", or "none")
   variant <- ifelse(nchar(scen) >= 2 && substr(scen, 2, 2) %in% c("d", "n"), substr(scen, 2, 2), "none")
-  
-  # Skip if `scen` is not found in any scenario-horizon folder
-  matching_folders <- grep(scen, scen_hor_folders, value = TRUE)
-  if (length(matching_folders) == 0) next
   
   # Create an entry for the scenario in the output list
   knmi_mit_output_list[[scen]] <- list()

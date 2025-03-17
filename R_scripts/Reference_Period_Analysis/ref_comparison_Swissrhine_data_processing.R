@@ -3,7 +3,7 @@ library(purrr)
 library(slider)
 library(here)
 
-data_dir <- file.path("Data", "Rheinblick", "routing")
+data_dir <- file.path("Data", "Rheinblick2027", "raw_prevah_output", "routing")
 hindcast_file <- file.path(here::here(), "Data", "Rhein", "Swissrhine200_CTRL_RUN_WSL_F_2021_g73.dat")
 observed_file <- file.path(here::here(), "Data", "R_KNMI", "observed", "CHBILANZ", "2289.daily.mean.dat")
 
@@ -161,7 +161,8 @@ compute_runoff_statistics_scenarios <- function(ref_rhine_list, area, column_nam
              Year = as.numeric(format(Date, "%Y"))) %>%
       filter(DayOfYear != 60 | !((Year %% 4 == 0) & (Year %% 100 != 0 | Year %% 400 == 0))) %>%
       mutate(DayOfYear = if_else(DayOfYear > 60 & (Year %% 4 == 0) & (Year %% 100 != 0 | Year %% 400 == 0), 
-                                 DayOfYear - 1, DayOfYear)) %>%
+                                 DayOfYear - 1, DayOfYear))
+    data <- data %>%
       group_by(DayOfYear) %>%
       summarise(
         Mean = mean(RM, na.rm = TRUE),
@@ -313,7 +314,7 @@ plot_runoff_statistics <- function(scenario_stats_list, y_label, variable, q_bot
   month_labels <- seq(as.Date("2023-01-15"), as.Date("2023-12-15"), by = "1 month")
   
   # Start plot with the background elements first
-  p <- ggplot(combined_stats, aes(x = DateLabel, group = Scenario, color = Scenario)) +
+  p <- ggplot(combined_stats_mean, aes(x = DateLabel, group = Scenario, color = Scenario)) +
     geom_vline(xintercept = as.numeric(month_lines), color = "gray90")  # Gridlines for months
   
   # Add Q10-Q90 ribbon in the background if show_range is TRUE
@@ -441,8 +442,8 @@ scenario_list <- c("reference", "hindcast", "observed")
 scenario_stats_list <- compute_runoff_statistics_scenarios(ref_rhine_list, "Rhine Basel", column_name = "rhinebasel", scenarios = scenario_list)
 
 # Call the plot function with the computed statistics
-plot_annual_boxplots(ref_rhine_list, scenario_list, "RhineBasel", "rhinebasel", "Mean", "Discharge", "[m³/s]")
+#plot_annual_boxplots(ref_rhine_list, scenario_list, "RhineBasel", "rhinebasel", "Mean", "Discharge", "[m³/s]")
 
- plot_runoff_statistics(scenario_stats_list, y_label = "Discharge", variable = "rhinebasel", show_ensemble = TRUE, show_range = FALSE)
- plot_runoff_statistics(scenario_stats_list, y_label = "Discharge", variable = "rhinebasel", show_ensemble = FALSE, show_range = FALSE)
- plot_runoff_statistics(scenario_stats_list, y_label = "Discharge", variable = "rhinebasel", show_ensemble = FALSE, show_range = TRUE)
+plot_runoff_statistics(scenario_stats_list, y_label = "Discharge", variable = "rhinebasel", show_ensemble = TRUE, show_range = FALSE)
+plot_runoff_statistics(scenario_stats_list, y_label = "Discharge", variable = "rhinebasel", show_ensemble = FALSE, show_range = FALSE)
+plot_runoff_statistics(scenario_stats_list, y_label = "Discharge", variable = "rhinebasel", show_ensemble = FALSE, show_range = TRUE)

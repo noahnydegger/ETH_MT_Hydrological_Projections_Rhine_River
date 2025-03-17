@@ -1,9 +1,14 @@
 library(here)
-library(reshape2)
 library(data.table)
 
+# project directory
 home_dir <- file.path(here::here())
-input_dir <- file.path(home_dir, "Data", "Rheinblick2027", "raw_prevah_output", "R_KNMI")
+
+# input directories
+input_dir_knmi <- file.path(home_dir, "Data", "Rheinblick2027", "raw_prevah_output", "R_KNMI")
+input_dir_hind <- file.path(home_dir, "Data", "Rheinblick2027", "raw_prevah_output", "R_KNMI", "hindcast", "CTRL_RUN_WSL_F_2021_g73")
+
+# output directory
 output_dir <- file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output")
 
 mit_output_file_suffix <- ".mit"
@@ -33,6 +38,75 @@ no_meteo_gebiete <- c(
 
 source(here("R_scripts", "data_import_functions.R"))
 
+read_raw_data <- function(file_path, horizon = NULL) {
+  # Read the raw discharge data from the file
+  raw_data <- fread(file_path)
+  
+  # Create Date column
+  raw_data[, date := as.Date(paste(YYYY, MM, DD, sep = "-"), format = "%Y-%m-%d")]
+  
+  # Filter rows between 30 year periods
+  if (!is.null(horizon)) {
+    raw_data <- raw_data[YYYY >= horizon - 14 & YYYY <= horizon + 15]
+  }
+  
+  return(raw_data)
+}
+
+process_mit_data <- function(data_file, horizon, scenario, variant, member, ezg) {
+  # Check if the file exists before reading
+  if (file.exists(data_file)) {
+    
+    # Read the discharge data
+    mit_data <- read_raw_data(data_file, horizon)
+    
+    value_columns <- setdiff(names(mit_data), c("YYYY", "MM", "DD"))
+    
+    # Add metadata columns for this specific folder
+    mit_data[, horizon := horizon]
+    mit_data[, scenario := scenario]
+    mit_data[, variant := variant]
+    mit_data[, member := member]
+    mit_data[, hydro_model := "PREVAH"]
+    mit_data[, basin := ezg]
+    
+    # Select required columns in correct order
+    mit_data <- mit_data[, c("basin", "date", "horizon", "scenario", "variant", "member", "hydro_model", value_columns), with = FALSE]
+    
+    return(mit_data)
+    
+  } else {
+    stop(paste("File not found:", data_file))
+  }
+}
+
+process_meteo_stats_data <- function(data_file, horizon, scenario, variant, member, ezg) {
+  # Check if the file exists before reading
+  if (file.exists(data_file)) {
+    
+    # Read the discharge data
+    stats_data <- read_raw_data(data_file, horizon)
+    
+    value_columns <- setdiff(names(stats_data), c("YYYY", "MM", "DD"))
+    
+    # Add metadata columns for this specific folder
+    stats_data[, horizon := horizon]
+    stats_data[, scenario := scenario]
+    stats_data[, variant := variant]
+    stats_data[, member := member]
+    stats_data[, hydro_model := "PREVAH"]
+    stats_data[, basin := ezg]
+    
+    # Select required columns in correct order
+    stats_data <- stats_data[, c("basin", "date", "horizon", "scenario", "variant", "member", "hydro_model", value_columns), with = FALSE]
+    
+    return(stats_data)
+    
+  } else {
+    stop(paste("File not found:", data_file))
+  }
+}
+
 knmi_mit_output_list <- list()
 knmi_meteo_stat_list <- list()
 
@@ -43,7 +117,7 @@ all_meteo_data_list <- list()
 if (dir.exists(geb_path)) {
   
   # List all subfolders inside the scenario folder
-  scen_hor_folders <- list.dirs(input_dir, recursive = FALSE)
+  scen_hor_folders <- list.dirs(input_dir_knmi, recursive = FALSE)
 }
 
 # import the .mit file for each scenario, ensemble, and area
@@ -87,36 +161,41 @@ for (scen in scenario_horizons) {
       # First process .mit files
       mit_file <- file.path(ezg_dir, paste0(ezg, mit_output_file_suffix))
       
-      # Check if the mit file exists before reading
-      if (file.exists(mit_file)) {
-        
-        # Import data from the .mit and .pri files
-        mit_data_d <- import_mit_data(mit_file)
-        
-        # Add metadata columns for this specific folder
-        mit_data_d[, horizon := horizon]
-        mit_data_d[, scenario := scenario]
-        mit_data_d[, variant := variant]
-        mit_data_d[, member := member]
-        mit_data_d[, hydro_model := "PREVAH"]
-        mit_data_d[, basin := ezg]
-        
-        # # Reorder columns as needed
-        # mit_data_long <- mit_data_long[, .(station, date, discharge, horizon, scenario, 
-        #                                    ensm, ezg, hydro_model)]
-        
-        # Append this to the list of all mit data
-        all_mit_data_list[[length(all_mit_data_list) + 1]] <- mit_data_d
+      mit_data <- process_mit_data(mit_file, horizon, scenario, variant, member, ezg)
       
-        # Store the loaded data in the list
-        # knmi_mit_output_list[[scen]][[ensm]][[ezg]][["daily"]] <- mit_data_d
-        # knmi_mit_output_list[[scen]][[ensm]][[ezg]][["monthly"]] <- compute_monthly_means(mit_data)
-        # knmi_mit_output_list[[scen]][[ensm]][[ezg]][["yearly"]] <- compute_yearly_means(mit_data)
-        
-      } else {
-        message(paste(".mit file not found:", mit_file))
-        knmi_mit_output_list[[scen]][[ensm]][[ezg]] <- NULL
-      }
+      # Append this to the list of all mit data
+      all_mit_data_list[[length(all_mit_data_list) + 1]] <- mit_data
+      
+      # # Check if the mit file exists before reading
+      # if (file.exists(mit_file)) {
+      #   
+      #   # Import data from the .mit and .pri files
+      #   mit_data_d <- import_mit_data(mit_file)
+      #   
+      #   # Add metadata columns for this specific folder
+      #   mit_data_d[, horizon := horizon]
+      #   mit_data_d[, scenario := scenario]
+      #   mit_data_d[, variant := variant]
+      #   mit_data_d[, member := member]
+      #   mit_data_d[, hydro_model := "PREVAH"]
+      #   mit_data_d[, basin := ezg]
+      #   
+      #   # # Reorder columns as needed
+      #   # mit_data_long <- mit_data_long[, .(station, date, discharge, horizon, scenario, 
+      #   #                                    ensm, ezg, hydro_model)]
+      #   
+      #   # Append this to the list of all mit data
+      #   all_mit_data_list[[length(all_mit_data_list) + 1]] <- mit_data_d
+      # 
+      #   # Store the loaded data in the list
+      #   # knmi_mit_output_list[[scen]][[ensm]][[ezg]][["daily"]] <- mit_data_d
+      #   # knmi_mit_output_list[[scen]][[ensm]][[ezg]][["monthly"]] <- compute_monthly_means(mit_data)
+      #   # knmi_mit_output_list[[scen]][[ensm]][[ezg]][["yearly"]] <- compute_yearly_means(mit_data)
+      #   
+      # } else {
+      #   message(paste(".mit file not found:", mit_file))
+      #   knmi_mit_output_list[[scen]][[ensm]][[ezg]] <- NULL
+      # }
       
       if (!(ezg %in% no_meteo_gebiete)) {
         # Initialize an empty data.table to store combined meteo data
@@ -158,11 +237,6 @@ for (scen in scenario_horizons) {
                 all = TRUE
               )
             }
-            
-            # Store the loaded data in the list
-            # knmi_meteo_stat_list[[scen]][[ensm]][[ezg]][[var]][["daily"]] <- meteo_data
-            # knmi_meteo_stat_list[[scen]][[ensm]][[ezg]][[var]][["monthly"]] <- compute_monthly_means(meteo_data)
-            # knmi_meteo_stat_list[[scen]][[ensm]][[ezg]][[var]][["yearly"]] <- compute_yearly_means(meteo_data)
             
           } else {
             message(paste("Meteo file not found:", meteo_file))

@@ -1,7 +1,7 @@
 library(here)
-library(reshape2)
 library(data.table)
 
+# project directory
 home_dir <- file.path(here::here())
 
 # input directories

@@ -1,302 +1,217 @@
+library(data.table)
+library(zoo)
+
+plot_info <- list(
+  scenario = list(
+    colors = c("O" = "black", "H" = "grey40", "R" = "grey70", "L" = "blue", "KNMI Ensembles" = "grey80"),
+    labels = c("O" = "Observed", "H" = "Hindcast", "R" = "KNMI Reference", "L" = "KNMI L", "KNMI Ensembles" = "KNMI ens")
+  ),
+  column_info = list(
+    y_labels = c(
+      "discharge" = "Discharge",
+      "P-UK" = "Interpolated precipitation",
+      "P-KOR" = "Adjusted interpolated precipitation3",
+      "P-SME" = "Snowmelt",
+      "EPOT" = "Potential evapotranspiration",
+      "EREA" = "Actual evapotranspiration",
+      "EI" = "Interception evaporation / snow evaporation",
+      "EB" = "Transpiration / soil evaporation",
+      "R0" = "Surface runoff",
+      "R1" = "Interflow",
+      "R2" = "Total baseflow",
+      "RGES" = "Total runoff",
+      "S-SNO" = "Snow water equivalent",
+      "SI" = "Interception storage",
+      "SSM" = "Plant available soil moisture storage",
+      "SUZ" = "Runoff generation storage (unsaturated zone)",
+      "SLZ" = "Runoff generation storage (saturated zone)",
+      "BIL" = "Balance from previous time step",
+      "GLAC" = "Ice melt",
+      "RG1" = "Fast response baseflow",
+      "RG2" = "Slow response baseflow",
+      "RG3" = "Third component baseflow",
+      "DIFGA" = "Input to DIFGA"
+    ),
+    units = c(
+      "discharge" = "m³/s",
+      "P-UK" = "mm/d",
+      "P-KOR" = "mm/d",
+      "P-SME" = "mm/d",
+      "EPOT" = "mm/d",
+      "EREA" = "mm/d",
+      "EI" = "mm/d",
+      "EB" = "mm/d",
+      "R0" = "mm/d",
+      "R1" = "mm/d",
+      "R2" = "mm/d",
+      "RGES" = "mm/d",
+      "S-SNO" = "mm",
+      "SI" = "mm",
+      "SSM" = "mm",
+      "SUZ" = "mm",
+      "SLZ" = "mm",
+      "BIL" = "mm/d",
+      "GLAC" = "mm/d",
+      "RG1" = "mm/d",
+      "RG2" = "mm/d",
+      "RG3" = "mm/d",
+      "DIFGA" = "mm/d"
+    )
+  )
+)
+
+statistics <- c("mean", "min", "max")
+
+basins <- c("ThS200")
+
+dt <- knmi_mit_output_dt[basin %in% basins]
+
+# group_cols <- c("station", "horizon", "scenario", "variant", "hydro_model")  # discharge_dt
+group_cols <- c("basin", "scenario", "variant", "hydro_model")  # knmi_mit_output_dt
+value_cols <- c("RGES", "P-SME", "GLAC", "EREA")
 
 
 
-ref_colors <- c("observed" = "black","hindcast" = "grey40","reference" = "grey70", "KNMI Ensembles" = "grey80")
+show_range <- FALSE
+show_ensemble <- FALSE
 
+q_bot <- 0.25
+q_top <- 0.75
 
-# Function to compute daily statistics for multiple scenarios
-compute_runoff_statistics_scenarios <- function(ref_rhine_list, area, column_name, scenarios, q_bot = 0.10, q_top = 0.90) {
+source(here("R_scripts", "data_processing_functions", "gof_metrics.R"))
+
+compute_daily_stats <- function(dt, group_cols, value_cols, stat = "mean") {
+  # Create a copy of the data to avoid modifying the original
+  dt <- copy(dt)
   
-  compute_daily_stats <- function(data) {
-    data <- data %>%
-      arrange(Date) %>%
-      mutate(RM = slide_dbl(.data[[column_name]], mean, .before = 14, .after = 15, .complete = TRUE),
-             DayOfYear = as.numeric(format(Date, "%j")),
-             Year = as.numeric(format(Date, "%Y"))) %>%
-      filter(DayOfYear != 60 | !((Year %% 4 == 0) & (Year %% 100 != 0 | Year %% 400 == 0))) %>%
-      mutate(DayOfYear = if_else(DayOfYear > 60 & (Year %% 4 == 0) & (Year %% 100 != 0 | Year %% 400 == 0), 
-                                 DayOfYear - 1, DayOfYear)) %>%
-      group_by(DayOfYear) %>%
-      summarise(
-        Mean = mean(RM, na.rm = TRUE),
-        q_bot = quantile(RM, q_bot, na.rm = TRUE),
-        q_top = quantile(RM, q_top, na.rm = TRUE)
-      ) %>%
-      filter(!is.na(Mean) | !is.na(q_bot) | !is.na(q_top))
-  }
+  # Compute rolling statistic for each column in value_cols
+  dt[, paste0("rm_", value_cols) := lapply(.SD, function(x) zoo::rollapply(
+    x, 
+    width = 30, 
+    FUN = match.fun(stat),  # Flexible statistics (mean, min, max)
+    fill = NA, 
+    align = "center", 
+    partial = TRUE,
+    na.rm = TRUE
+  )), by = group_cols, .SDcols = value_cols]
   
-  # Initialize a list to store results for each scenario
-  scenario_stats_list <- list()
+  # Add DayOfYear column and filter out Day 366
+  dt <- dt[as.numeric(format(date, "%j")) != 366]
+  dt[, DayOfYear := as.numeric(format(date, "%j"))]
   
-  # Loop through each scenario in the scenario list
-  for (scenario in scenarios) {
-    if (scenario == "reference") {
-      # Extract the ensemble data for the specified area and scenario
-      ensemble_data_list <- lapply(grep("^ens[0-9]+$", names(ref_rhine_list[[scenario]]), value = TRUE), function(ensemble) {
-        ref_rhine_list[[scenario]][[ensemble]][["daily"]]
-      })
-      
-      # Process each ensemble data and compute statistics for the given column
-      ensemble_stats <- ensemble_data_list %>%
-        map(function(data) {
-          # Compute 30-day centered rolling mean for the specified column
-          data <- data %>%
-            arrange(Date) %>%
-            mutate(
-              RM = slide_dbl(.data[[column_name]], mean, .before = 14, .after = 15, .complete = TRUE)
-            )
-          
-          # Identify leap years and adjust DayOfYear for them
-          data <- data %>%
-            mutate(DayOfYear = as.numeric(format(Date, "%j")),  # Create DayOfYear column
-                   Year = as.numeric(format(Date, "%Y"))) %>%   # Extract Year for leap year check
-            # Remove leap days (Feb 29)
-            filter(DayOfYear != 60 | !((Year %% 4 == 0) & (Year %% 100 != 0 | Year %% 400 == 0))) %>%
-            # Shift the DayOfYear for leap years (after Feb 29)
-            mutate(DayOfYear = if_else(DayOfYear > 60 & (Year %% 4 == 0) & (Year %% 100 != 0 | Year %% 400 == 0), 
-                                       DayOfYear - 1, 
-                                       DayOfYear))
-          
-          return(data)
-        })
-      
-      # Combine data from all ensembles for this scenario
-      combined_data <- bind_rows(ensemble_stats)
-      
-      # Compute daily statistics for the specified column across all ensembles for this scenario
-      daily_stats <- combined_data %>%
-        group_by(DayOfYear) %>%
-        summarise(
-          Mean = mean(RM, na.rm = TRUE),
-          q_bot = quantile(RM, q_bot, na.rm = TRUE),
-          q_top = quantile(RM, q_top, na.rm = TRUE)
-        ) %>%
-        filter(!is.na(Mean) | !is.na(q_bot) | !is.na(q_top))
-      
-      # Add the scenario column to differentiate between scenarios
-      daily_stats$Scenario <- scenario
-      
-      # Store the results in the list
-      scenario_stats_list[[scenario]] <- daily_stats
-      
-      # Add the rolling means for each ensemble individually
-      for (ens in ensenmbles) {
-        ensemble_data <- ref_rhine_list[[scenario]][[ens]][["daily"]]
-        
-        daily_stats <- compute_daily_stats(ensemble_data)
-        
-        scen_ens <- paste0(scenario, "_", ens)
-        daily_stats$Scenario <- scen_ens
-        scenario_stats_list[[scen_ens]] <- daily_stats
-      }
-      
-    } else if (scenario %in% c("hindcast", "observed")) {
-      # Single ensemble case
-      data <- ref_rhine_list[[scenario]][["daily"]]
-      
-      daily_stats <- compute_daily_stats(data)
-      
-      daily_stats$Scenario <- scenario
-      scenario_stats_list[[scenario]] <- daily_stats
-    }
-  }
-  
-  return(scenario_stats_list)
+  return(dt)
 }
 
+# Function to compute mean of selected columns grouped by specified columns
+compute_stats <- function(dt, group_cols, value_cols, stat = "mean", q_bot = 0.25, q_top = 0.75) {
+  # Ensure required columns are present
+  if (!all(c(group_cols, value_cols) %in% names(dt))) {
+    stop("Some specified columns are not in the data.table")
+  }
+  
+  # Compute specified statistics
+  dt[, c(
+    setNames(lapply(.SD, match.fun(stat), na.rm = TRUE), paste0(stat, "_", value_cols)),
+    setNames(lapply(.SD, quantile, probs = q_bot, na.rm = TRUE), paste0("q_bot_", value_cols)),
+    setNames(lapply(.SD, quantile, probs = q_top, na.rm = TRUE), paste0("q_top_", value_cols))
+  ), 
+  by = group_cols, 
+  .SDcols = value_cols]
+}
 
-# Function to plot the statistics for multiple scenarios
-plot_runoff_statistics <- function(scenario_stats_list, y_label, variable, q_bot = 0.10, q_top = 0.90, show_ensemble = TRUE, show_range = FALSE) {
-  mean_scenarios <- c("observed", "hindcast", "reference")  # List of scenarios to include
-  ind_scenarios <- grep("^reference_ens", names(scenario_stats_list), value = TRUE)
+# Function to plot the statistics
+plot_runoff_statistics <- function(data, column, y_label, y_unit, q_bot = 0.10, q_top = 0.90, show_ensemble = FALSE, show_range = FALSE, stat) {
+  mean_name <- paste0(stat, "_", column)
+  q_bot_name <- paste0("q_bot_", column)
+  q_top_name <- paste0("q_top_", column)
   
-  # Combine the statistics for mean scenarios into one data frame
-  combined_stats_mean <- bind_rows(scenario_stats_list[mean_scenarios])
-  
-  # Combine the statistics for individual ensemble scenarios into another data frame
-  combined_stats_ensemble <- bind_rows(scenario_stats_list[ind_scenarios])
-  
-  # Convert DayOfYear to date-like values (use 2023 as a dummy year) for mean scenarios
-  combined_stats_mean <- combined_stats_mean %>%
-    mutate(DateLabel = as.Date(DayOfYear - 1, origin = "2023-01-01"),
-           Scenario = factor(Scenario, levels = c("observed", "hindcast","reference")))  # Ensure reference is first
-  
-  # Convert DayOfYear to date-like values (use 2023 as a dummy year) for ensemble scenarios
-  combined_stats_ensemble <- combined_stats_ensemble %>%
-    mutate(DateLabel = as.Date(DayOfYear - 1, origin = "2023-01-01"))
-           
-  
-  # Compute NSE values
-  compute_nse <- function(df, scenario1, scenario2) {
-    observed <- df %>% 
-      filter(Scenario == scenario1) %>% 
-      arrange(DayOfYear) %>% 
-      pull(Mean)  # Select only the 'Mean' column
-    
-    simulated <- df %>% 
-      filter(Scenario == scenario2) %>% 
-      arrange(DayOfYear) %>% 
-      pull(Mean)  # Select only the 'Mean' column
-    
-    if (length(observed) == length(simulated) && length(observed) > 0) {
-      mean_obs <- mean(observed, na.rm = TRUE)
-      numerator <- sum((observed - simulated)^2, na.rm = TRUE)
-      denominator <- sum((observed - mean_obs)^2, na.rm = TRUE)
-      return(1 - (numerator / denominator))
-    } else {
-      return(NA)  # Return NA if lengths are different or data is missing
-    }
-  }
-  
-  nse_obs_hindcast <- compute_nse(combined_stats_mean, "observed", "hindcast")
-  nse_obs_reference <- compute_nse(combined_stats_mean, "observed", "reference")
-  nse_hindcast_reference <- compute_nse(combined_stats_mean, "hindcast", "reference")
-  
-  # Subtitle text
-  subtitle_text <- paste0(
-    "NSE(obs vs hindcast) = ", round(nse_obs_hindcast, 2), " | ",
-    "NSE(obs vs KNMI) = ", round(nse_obs_reference, 2), " | ",
-    "NSE(hindcast vs KNMI) = ", round(nse_hindcast_reference, 2)
-  )
-  
-  
-  # Create breaks for the start of each month (gridlines)
+  # nse_obs_hindcast <- compute_nse(scenario_stats_DT, "observed", "hindcast")
+  # nse_obs_reference <- compute_nse(scenario_stats_DT, "observed", "reference")
+  # nse_hindcast_reference <- compute_nse(scenario_stats_DT, "hindcast", "reference")
+  # 
+  # # Subtitle text
+  # subtitle_text <- paste0(
+  #   "NSE(obs vs hindcast) = ", round(nse_obs_hindcast, 2), " | ",
+  #   "NSE(obs vs KNMI) = ", round(nse_obs_reference, 2), " | ",
+  #   "NSE(hindcast vs KNMI) = ", round(nse_hindcast_reference, 2)
+  # )
+  subtitle_text <- "Placeholder"
+
+  # Add month lines and labels
   month_lines <- seq(as.Date("2023-01-01"), as.Date("2023-12-01"), by = "1 month")
-  
-  # Create breaks for month labels (placed on the 15th)
   month_labels <- seq(as.Date("2023-01-15"), as.Date("2023-12-15"), by = "1 month")
-  
-  # Start plot with the background elements first
-  p <- ggplot(combined_stats, aes(x = DateLabel, group = Scenario, color = Scenario)) +
-    geom_vline(xintercept = as.numeric(month_lines), color = "gray90")  # Gridlines for months
-  
-  # Add Q10-Q90 ribbon in the background if show_range is TRUE
+
+  # Plot
+  p <- ggplot(data, aes(x = as.Date(DayOfYear - 1, origin = "2023-01-01"),
+                                     group = scenario, color = scenario)) +
+    geom_vline(xintercept = as.numeric(month_lines), color = "gray90")
+
   if (show_range) {
-    p <- p + geom_ribbon(aes(ymin = q_bot, ymax = q_top, fill = Scenario), alpha = 0.4)
+    p <- p + geom_ribbon(aes(ymin = .data[[q_bot_name]], ymax = .data[[q_top_name]], fill = scenario), alpha = 0.4)
   }
-  
-  # Add the individual ensembles if show_ensemble flag is TRUE
+
   if (show_ensemble) {
-    p <- p + 
-      geom_line(data = combined_stats_ensemble, aes(y = Mean, color = "KNMI Ensembles"), size = 1)  # Individual ensembles with size 1
+    p <- p + geom_line(aes(y = .data[[mean_name]], color = "KNMI Ensembles"), size = 1)
   }
-  
-  # Add the mean line on top of the ribbon
-  p <- p + geom_line(aes(y = Mean), size = 2) +
-    scale_x_date(
-      date_labels = "%b",
-      breaks = month_labels,
-      expand = c(0, 0)  # Remove empty space before Jan 1 and after Dec 31
-    ) +
+
+  p <- p + geom_line(aes(y = .data[[mean_name]]), size = 2) +
+    scale_x_date(date_labels = "%b", breaks = month_labels, expand = c(0, 0)) +
     labs(
-      title = paste0("30-day Moving Average Mean ", y_label, ifelse(show_range, paste0(" with Q", q_bot*100, "-Q", q_top*100), ""), " (1991-2020) Basel, Rheinhalle"),
+      title = paste("30-day Moving Average", stat, y_label),
       subtitle = subtitle_text,
       x = "Month",
-      y = paste(y_label, "[m³/s]"),
+      y = paste(y_label, y_unit),
       color = "Dataset",
       fill = "Dataset"
     ) +
     theme_minimal(base_size = 14) +
     theme(
-      panel.grid.major.x = element_blank(),  # Remove automatic gridlines
-      panel.grid.major.y = element_line(color = "gray90"),  # Solid horizontal gridlines
-      panel.grid.minor = element_blank(),  # Remove minor gridlines
-      text = element_text(color = "black"),  # Make all text black
+      panel.grid.major.x = element_blank(),
+      panel.grid.major.y = element_line(color = "gray90"),
+      panel.grid.minor = element_blank(),
+      text = element_text(color = "black"),
       axis.title.x = element_blank(),
-      axis.text = element_text(size = 14, color = "black"),  
-      axis.title = element_text(size = 16, face = "bold", color = "black"),  
-      legend.text = element_text(size = 14, color = "black"),  
-      legend.title = element_text(size = 16, face = "bold", color = "black"),  
-      plot.title = element_text(size = 18, face = "bold", hjust = 0.5, color = "black")  
+      axis.text = element_text(size = 14, color = "black"),
+      axis.title = element_text(size = 16, face = "bold", color = "black"),
+      legend.text = element_text(size = 14, color = "black"),
+      legend.title = element_text(size = 16, face = "bold", color = "black"),
+      plot.title = element_text(size = 18, face = "bold", hjust = 0.5, color = "black")
     ) +
     scale_color_manual(
-      values = ref_colors,
-      labels = c("observed" = "Observed", "hindcast" = "Hindcast", "reference" = "KNMI Mean", 
-                 "KNMI Ensembles" = "KNMI ens")  # Change legend labels
+      values = plot_info$scenario$colors,
+      labels = plot_info$scenario$labels
     ) +
     if (show_range) scale_fill_manual(
-      values = ref_colors,
-      labels = c("observed" = "Observed", "hindcast" = "Hindcast", "reference" = "KNMI", 
-                 "KNMI Ensembles" = "KNMI ens")  # Change legend labels
-    ) else ylim(750, 1750) 
-  
-  # Save the plot as a PDF file
+      values = plot_info$scenario$colors,
+      labels = plot_info$scenario$labels
+    ) else NULL #ylim(750, 1750) 
+
+  # Save the plot
   save_dir <- file.path(here::here(), "Plots", "Reference_Period_Analysis", "TimeSeries")
   if (!dir.exists(save_dir)) {
     dir.create(save_dir, recursive = TRUE, showWarnings = FALSE)
   }
-  filename <- paste0("TS_", y_label, ifelse(show_ensemble,"ens", ""), ifelse(show_range, paste0("_Q", q_bot*100, "_Q", q_top*100), ""), ".pdf")
+
+  filename <- paste0("TS_Test_", stat, "_", y_label, ifelse(show_ensemble,"ens", ""), ifelse(show_range, paste0("_Q", q_bot*100, "_Q", q_top*100), ""), ".pdf")
   ggsave(file.path(save_dir, filename), plot = p, device = "pdf", width = 18, height = 6)
 }
 
-plot_annual_boxplots <- function(ref_rhine_list, scenarios, geb, c_name, stat, y_label, unit) {
-  
-  # Initialize a list to store yearly data
-  yearly_list <- list()
-  
-  for (scenario in scenarios) {
-    # Select only the reference ensemble mean and hindcast scenario
-    if (scenario == "reference") {
-      yearly_data <- ref_rhine_list[[scenario]][["ensMean"]][["yearly"]]
-      
-    } else {
-      yearly_data <- ref_rhine_list[[scenario]][["yearly"]]
-    }
-    
-    yearly_data <- yearly_data %>%
-      select(YYYY, all_of(c_name)) %>%
-      mutate(Scenario = scenario)  # Add Scenario column
-    
-    yearly_list[[length(yearly_list) + 1]] <- yearly_data
+rolling_stats_dt <- compute_daily_stats(dt, group_cols, value_cols)
+
+# Add "rm_" prefix to each value column
+group_cols <- c(group_cols, "DayOfYear")
+value_cols <- paste0("rm_", value_cols)
+
+for (column in value_cols) {
+  for (stat in statistics) {
+    seasonality_dt <- compute_stats(rolling_stats_dt, group_cols = group_cols, value_cols = column, stat = stat)
+    col <- sub("rm_", "", column)
+    y_label <- plot_info$column_info$y_labels[[col]]
+    y_unit <- plot_info$column_info$units[[col]]
+    plot_runoff_statistics(seasonality_dt, column, y_label = y_label, y_unit = y_unit, show_ensemble = show_ensemble, show_range = show_range, stat = stat)
   }
-  
-  # Combine extracted data
-  yearly_df <- do.call(rbind, yearly_list)
-  
-  # Ensure Scenario is a factor with correct order
-  yearly_df$Scenario <- factor(yearly_df$Scenario, levels = c("observed", "hindcast", "reference"))
-  
-  # Plot annual boxplots
-  p <- ggplot(yearly_df, aes(x = Scenario, y = .data[[c_name]], fill = Scenario)) +
-    geom_boxplot(position = position_dodge(width = 0.8), fatten = 2, size = 0.8) +  
-    labs(
-      title = paste("Annual", stat, y_label),
-      x = "Dataset",
-      y = paste(y_label, unit),
-      fill = "Dataset"
-    ) +
-    theme_minimal(base_size = 16) +  
-    theme(
-      text = element_text(color = "black"),
-      axis.title.x = element_blank(),
-      axis.text = element_text(size = 14, color = "black"),  
-      axis.title = element_text(size = 16, face = "bold", color = "black"),  
-      legend.text = element_text(size = 14, color = "black"),  
-      legend.title = element_text(size = 16, face = "bold"),  
-      plot.title = element_text(size = 18, face = "bold", hjust = 0.5, color = "black"),
-      panel.grid.major.x = element_blank(),  # Remove vertical gridlines
-      panel.grid.minor.x = element_blank()   # Remove minor vertical gridlines  
-    ) +
-    scale_fill_manual(values = ref_colors, labels = ref_labels) +
-    scale_x_discrete(labels = NULL)  # Remove x-axis labels (only the legend will show)
-  
-  # save the plot as a pdf file
-  save_dir <- file.path(here::here(), "Plots","Reference_Period_Analysis", "Boxplots")
-  if (!dir.exists(save_dir)) {
-    dir.create(save_dir, recursive = TRUE, showWarnings = FALSE)
-  }
-  ggsave(file.path(save_dir, paste0(geb,"_", y_label, "_annual.pdf")), plot = p, device = "pdf", width = 8, height = 6)
 }
 
-# Define the list of scenarios
-scenario_list <- c("reference", "hindcast", "observed")
 
-# Compute daily statistics for all ensembles for each scenario
-scenario_stats_list <- compute_runoff_statistics_scenarios(ref_rhine_list, "Rhine Basel", column_name = "rhinebasel", scenarios = scenario_list)
 
-# Call the plot function with the computed statistics
-plot_annual_boxplots(ref_rhine_list, scenario_list, "RhineBasel", "rhinebasel", "Mean", "Discharge", "[m³/s]")
 
- plot_runoff_statistics(scenario_stats_list, y_label = "Discharge", variable = "rhinebasel", show_ensemble = TRUE, show_range = FALSE)
- plot_runoff_statistics(scenario_stats_list, y_label = "Discharge", variable = "rhinebasel", show_ensemble = FALSE, show_range = FALSE)
- plot_runoff_statistics(scenario_stats_list, y_label = "Discharge", variable = "rhinebasel", show_ensemble = FALSE, show_range = TRUE)

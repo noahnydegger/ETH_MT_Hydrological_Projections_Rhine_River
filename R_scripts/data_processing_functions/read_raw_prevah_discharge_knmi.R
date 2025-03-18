@@ -147,7 +147,7 @@ for (geb in gebiete) {
 data_file <- file.path(input_dir_hind, input_file_hind)
 discharge_long <- process_discharge_data(data_file, column_names_prevah, selected_stations, 
                        horizon = 2005, 
-                       scenario = "H", 
+                       scenario = "C", # for control run
                        variant = "none",
                        member = 1)
 

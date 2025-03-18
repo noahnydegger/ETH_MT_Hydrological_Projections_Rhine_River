@@ -192,6 +192,7 @@ for (scen in scenario_horizons) {
   
   # Loop over matching folders
   for (scen_ensm_dir in matching_folders) {
+    cat("Processing scenario-ensemble:", basename(scen_ensm_dir), "\n")
     
     # Extract the ensemble member number (ens1 to ens8) as a numeric value and as a string
     member <- as.numeric(sub(".*_ens([1-8])$", "\\1", basename(scen_ensm_dir)))
@@ -227,8 +228,9 @@ for (scen in scenario_horizons) {
 } # scenario_horizons loop
 
 # hindcast data
+cat("Processing hindcast data\n")
 horizon <- 2005
-scenario <- "H"
+scenario <- "C" # for control run
 variant <- "none"
 member <- 1
 # List all subfolders (gebiete) in the matched scenario-ensemble folder

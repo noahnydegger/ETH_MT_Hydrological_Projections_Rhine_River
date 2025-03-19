@@ -4,11 +4,15 @@ library(data.table)
 source(here("R_scripts", "plotting_functions", "plot_metadata_knmi.R"))
 
 # PDF Plot Function
-plot_pdf <- function(dt, bsn, color_col, value_col, x_name, x_unit) {
+plot_pdf <- function(dt, bsn, color_col, value_col) {
+  
+  value_name <- plot_info$column_info$names[[value_col]]
+  value_unit <- plot_info$column_info$units[[value_col]]
+  
   p <- ggplot(dt, aes(x = .data[[value_col]], color = .data[[color_col]])) +
     stat_density(geom = "line") +
-    labs(title = paste("PDF", x_name, bsn),
-         x = paste(x_name, x_unit),
+    labs(title = paste("PDF", value_name, bsn),
+         x = paste(value_name, value_unit),
          y = "Density",
          color = "Dataset"
          ) +
@@ -29,11 +33,15 @@ plot_pdf <- function(dt, bsn, color_col, value_col, x_name, x_unit) {
 }
 
 # CDF Plot Function
-plot_cdf <- function(dt, bsn, color_col, value_col, x_name, x_unit) {
+plot_cdf <- function(dt, bsn, color_col, value_col) {
+  
+  value_name <- plot_info$column_info$names[[value_col]]
+  value_unit <- plot_info$column_info$units[[value_col]]
+  
   p <- ggplot(dt, aes(x = .data[[value_col]], color = .data[[color_col]])) +
     stat_ecdf(geom = "step") +  # Step plot for CDF
-    labs(title = paste("CDF", x_name, bsn),
-         x = paste(x_name, x_unit),
+    labs(title = paste("CDF", value_name, bsn),
+         x = paste(value_name, value_unit),
          y = "Cumulative Probability",
          color = "Dataset"
     ) +

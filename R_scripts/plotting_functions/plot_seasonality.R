@@ -46,10 +46,15 @@ compute_seasonality <- function(dt, group_cols, value_cols, stat = "mean", q_bot
 }
 
 # Function to plot the statistics
-plot_seasonality_ts <- function(dt, bsn, color_col, column, y_label, y_unit, q_bot = 0.10, q_top = 0.90, show_ensemble = FALSE, show_range = FALSE, gof_pairs = NULL, stat) {
-  stat_col <- paste0(stat, "_", column)
-  q_bot_col <- paste0("q_bot_", column)
-  q_top_col <- paste0("q_top_", column)
+plot_seasonality_ts <- function(dt, bsn, color_col, value_col, q_bot = 0.10, q_top = 0.90, show_ensemble = FALSE, show_range = FALSE, gof_pairs = NULL, stat) {
+  col_name <- sub("rm_", "", value_col)
+  
+  value_name <- plot_info$column_info$names[[col_name]]
+  value_unit <- plot_info$column_info$units[[col_name]]
+  
+  stat_col <- paste0(stat, "_", value_col)
+  q_bot_col <- paste0("q_bot_", value_col)
+  q_top_col <- paste0("q_top_", value_col)
   
   if (!is.null(gof_pairs)) {
 
@@ -86,10 +91,10 @@ plot_seasonality_ts <- function(dt, bsn, color_col, column, y_label, y_unit, q_b
   p <- p + geom_line(aes(y = .data[[stat_col]]), linewidth = 1) +
     scale_x_date(date_labels = "%b", breaks = month_labels, expand = c(0, 0)) +
     labs(
-      title = paste("30-day Moving Average", stat, y_label, bsn),
+      title = paste("30-day Moving Average", stat, value_name, bsn),
       subtitle = subtitle_text,
       x = "Month",
-      y = paste(y_label, y_unit),
+      y = paste(value_name, value_unit),
       color = "Dataset",
       fill = "Dataset"
     ) +
@@ -107,8 +112,8 @@ plot_seasonality_ts <- function(dt, bsn, color_col, column, y_label, y_unit, q_b
     ) else NULL
 
   # Save the plot
-  save_dir <- file.path(here::here(), "Plots", "Reference_Period_Analysis", "Seasonality", bsn)
-  filename <- paste0("seasonality_ts_", bsn, "_", stat, "_", column, ifelse(show_ensemble,"ens", ""), ifelse(show_range, paste0("_Q", q_bot*100, "_Q", q_top*100), ""), ".pdf")
+  save_dir <- file.path(here::here(), "Plots", "Reference_Period_Analysis", "Seasonality", col_name)
+  filename <- paste0("seasonality_ts_", bsn, "_", stat, "_", col_name, ifelse(show_ensemble,"ens", ""), ifelse(show_range, paste0("_Q", q_bot*100, "_Q", q_top*100), ""), ".pdf")
   save_plot(p, save_dir, filename, width = 18, height = 6)
   
 }

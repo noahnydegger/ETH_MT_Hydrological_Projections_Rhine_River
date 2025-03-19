@@ -138,8 +138,8 @@ plot_info <- list(
       "discharge" = "Discharge",
       
       # mit output file
-      "P-UK" = "Interpolated precipitation",
-      "P-KOR" = "Adjusted interpolated precipitation3",
+      "P-uk" = "Interpolated precipitation",
+      "P-kor" = "Adjusted interpolated precipitation3",
       "P-SME" = "Snowmelt",
       "EPOT" = "Potential evapotranspiration",
       "EREA" = "Actual evapotranspiration",
@@ -197,8 +197,8 @@ plot_info <- list(
       "discharge" = "m³/s",
       
       # mit output file
-      "P-UK" = "mm/d",
-      "P-KOR" = "mm/d",
+      "P-uk" = "mm/d",
+      "P-kor" = "mm/d",
       "P-SME" = "mm/d",
       "EPOT" = "mm/d",
       "EREA" = "mm/d",

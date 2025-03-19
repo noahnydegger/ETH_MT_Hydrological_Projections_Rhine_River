@@ -34,7 +34,7 @@ scenarios <- c(
   "reference"
 )
 
-read_raw_discharge_data <- function(file_path, column_names, horizon = NULL) {
+read_raw_discharge_data <- function(file_path, column_names) {
   # Read the raw discharge data from the file
   raw_data <- fread(file_path, header = FALSE)
   
@@ -44,11 +44,6 @@ read_raw_discharge_data <- function(file_path, column_names, horizon = NULL) {
   # Create Date column
   raw_data[, date := as.Date(paste(YYYY, MM, DD, sep = "-"), format = "%Y-%m-%d")]
   
-  # Filter rows between 30 year periods
-  if (!is.null(horizon)) {
-    raw_data <- raw_data[YYYY >= horizon - 14 & YYYY <= horizon + 15]
-  }
-  
   return(raw_data)
 }
 
@@ -57,7 +52,7 @@ process_discharge_data <- function(data_file, column_names, selected_stations, h
   if (file.exists(data_file)) {
     
     # Read the discharge data
-    discharge_data <- read_raw_discharge_data(data_file, column_names, horizon)
+    discharge_data <- read_raw_discharge_data(data_file, column_names)
     
     # Convert from wide to long format
     discharge_long <- melt(discharge_data, id.vars = c("YYYY", "MM", "DD", "date"),
@@ -88,11 +83,14 @@ process_discharge_data <- function(data_file, column_names, selected_stations, h
   }
 }
 
+cat("Processing knmi_discharge from:", input_dir_knmi, "\n")
+
 # Initialize an empty list to store all processed data
 discharge_data_list <- list()
 
 # Loop over each area (gebiete)
 for (geb in gebiete) {
+  cat("Processing gebiet:", geb, "\n")
   # Define the base path for the gebiet
   geb_path <- file.path(input_dir_knmi, geb)
   
@@ -166,16 +164,16 @@ discharge_long <- process_discharge_data(data_file, column_names_obse, selected_
 discharge_data_list[[length(discharge_data_list) + 1]] <- discharge_long
 
 # Combine all knmi data into a single data.table
-discharge_dt <- rbindlist(discharge_data_list, use.names = TRUE, fill = TRUE)
+knmi_discharge_dt <- rbindlist(discharge_data_list, use.names = TRUE, fill = TRUE)
 
 if (!dir.exists(output_dir)) {
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 }
 
 # Export to CSV
-write.csv2(discharge_dt, file.path(output_dir, paste0(output_file_name, ".csv")), row.names = FALSE, quote = FALSE)
+write.csv2(knmi_discharge_dt, file.path(output_dir, paste0(output_file_name, ".csv")), row.names = FALSE, quote = FALSE)
 
 # Export to .RDS format
-saveRDS(discharge_dt, file.path(output_dir, paste0(output_file_name, ".rds")))
+saveRDS(knmi_discharge_dt, file.path(output_dir, paste0(output_file_name, ".rds")))
         
         

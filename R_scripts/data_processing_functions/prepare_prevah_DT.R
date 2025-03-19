@@ -95,3 +95,8 @@ for (i in seq_along(dt_variables)) {
 }
 
 knmi_dt_list <- apply_to_dt_list(knmi_dt_list)
+
+# # Filter rows between 30 year periods
+# if (!is.null(horizon)) {
+#   raw_data <- raw_data[YYYY >= horizon - 14 & YYYY <= horizon + 15]
+# }

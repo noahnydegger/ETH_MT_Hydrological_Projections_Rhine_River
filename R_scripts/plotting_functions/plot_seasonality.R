@@ -4,7 +4,7 @@ library(hydroGOF)
 
 
 source(here("R_scripts", "data_processing_functions", "gof_metrics.R"))
-source(here("R_scripts", "plotting_functions", "plot_metadata_knmi.R"))
+source(here("R_scripts", "plotting_functions", "knmi_plot_metadata.R"))
 
 compute_rolling_stats <- function(dt, group_cols, value_cols, stat = "mean", width = 30) {
   # Create a copy of the data to avoid modifying the original

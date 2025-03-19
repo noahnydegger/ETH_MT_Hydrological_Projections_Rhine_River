@@ -1,5 +1,5 @@
 
-source(here("R_scripts", "plotting_functions", "plot_metadata_knmi.R"))
+source(here("R_scripts", "plotting_functions", "knmi_plot_metadata.R"))
 
 plot_one_day_values <- function(dt, bsn, color_col, value_col, date_col, target_day) {
   

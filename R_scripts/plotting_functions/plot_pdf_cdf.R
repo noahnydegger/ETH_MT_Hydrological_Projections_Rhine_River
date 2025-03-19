@@ -1,7 +1,7 @@
 library(ggplot2)
 library(data.table)
 
-source(here("R_scripts", "plotting_functions", "plot_metadata_knmi.R"))
+source(here("R_scripts", "plotting_functions", "knmi_plot_metadata.R"))
 
 # PDF Plot Function
 plot_pdf <- function(dt, bsn, color_col, value_col) {

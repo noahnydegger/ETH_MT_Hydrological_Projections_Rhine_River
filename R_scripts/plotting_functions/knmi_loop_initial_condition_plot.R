@@ -9,12 +9,12 @@ color_col <- "scen_var_hor"
 date_col <- "date"
 sel_day <- "1991-01-01"
 
-basins <- c("ThS200", "Thu200")
+basins <- c("ThS200", "Thu200", "RhB200")
 
 scenarios <- c("C", "R")#, "L", "M", "H")
 
 if (dataset == "mit_output") {
-  value_cols <- c("S-SNO", "P-SME")
+  value_cols <- c("S-SNO")
   dt_dataset <- knmi_mit_output_dt
   
 } else if (dataset == "meteo_stat") {
@@ -24,8 +24,8 @@ if (dataset == "mit_output") {
 
 dt_subset <- dt_dataset[basin %in% basins & scenario %in% scenarios]
 
-source(here("R_scripts", "plotting_functions", "initial_condition_plot.R"))
-source(here("R_scripts", "plotting_functions", "plot_metadata_knmi.R"))
+source(here("R_scripts", "plotting_functions", "plot_initial_condition.R"))
+source(here("R_scripts", "plotting_functions", "knmi_plot_metadata.R"))
 
 # generate pdf, cdf plots
 for (bsn in basins) {

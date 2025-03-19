@@ -54,17 +54,12 @@ no_knmi_gebiete <- c(
 
 source(here("R_scripts", "data_import_functions.R"))
 
-read_raw_data <- function(file_path, horizon = NULL) {
+read_raw_data <- function(file_path) {
   # Read the raw discharge data from the file
   raw_data <- fread(file_path)
   
   # Create Date column
   raw_data[, date := as.Date(paste(YYYY, MM, DD, sep = "-"), format = "%Y-%m-%d")]
-  
-  # Filter rows between 30 year periods
-  if (!is.null(horizon)) {
-    raw_data <- raw_data[YYYY >= horizon - 14 & YYYY <= horizon + 15]
-  }
   
   return(raw_data)
 }
@@ -74,7 +69,7 @@ process_mit_data <- function(data_file, horizon, scenario, variant, member, ezg)
   if (file.exists(data_file)) {
     
     # Read the discharge data
-    mit_data <- read_raw_data(data_file, horizon)
+    mit_data <- read_raw_data(data_file)
     
     value_columns <- setdiff(names(mit_data), c("YYYY", "MM", "DD", "date"))
     
@@ -112,7 +107,7 @@ process_meteo_stats_data <- function(ezg_dir, meteo_variables, meteo_stat_file_s
     if (file.exists(meteo_file)) {
       
       # Import data from the .stats file
-      meteo_data <- read_raw_data(meteo_file, horizon)
+      meteo_data <- read_raw_data(meteo_file)
       
       # Rename meteo-specific columns with 'var_' prefix
       old_meteo_cols <- c("MIN", "MAX", "AVG", "STDEV")
@@ -153,8 +148,7 @@ process_meteo_stats_data <- function(ezg_dir, meteo_variables, meteo_stat_file_s
   return(all_meteo_data_dt)
 }
 
-# knmi_mit_output_list <- list()
-# knmi_meteo_stat_list <- list()
+cat("Processing knmi_mit_output from:", input_dir_knmi, "\n")
 
 # Initialize an empty list to store the data.tables
 all_mit_data_list <- list()

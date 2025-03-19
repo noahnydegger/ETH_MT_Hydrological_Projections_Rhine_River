@@ -1,0 +1,53 @@
+library(ggplot2)
+library(data.table)
+
+source(here("R_scripts", "plotting_functions", "plot_metadata_knmi.R"))
+
+# PDF Plot Function
+plot_pdf <- function(dt, bsn, color_col, value_col, x_name, x_unit) {
+  p <- ggplot(dt, aes(x = .data[[value_col]], color = .data[[color_col]])) +
+    stat_density(geom = "line") +
+    labs(title = paste("PDF", x_name, bsn),
+         x = paste(x_name, x_unit),
+         y = "Density",
+         color = "Dataset"
+         ) +
+    custom_theme() +
+    scale_color_manual(
+      values = plot_info[[color_col]]$colors,
+      labels = plot_info[[color_col]]$labels,
+      guide = guide_legend(override.aes = list(linetype = 1, shape = NA))  # Only a line in the legend
+    ) +
+    scale_x_continuous(
+      limits = c(min(dt[[value_col]]), max(dt[[value_col]]))  # Add small space on both ends
+    )
+  
+  # Save the plot
+  save_dir <- file.path(here::here(), "Plots", "Reference_Period_Analysis", "Distribution", value_col)
+  filename <- paste0("pdf_", bsn, "_", value_col, ".pdf")
+  save_plot(p, save_dir, filename, width = 8, height = 6)
+}
+
+# CDF Plot Function
+plot_cdf <- function(dt, bsn, color_col, value_col, x_name, x_unit) {
+  p <- ggplot(dt, aes(x = .data[[value_col]], color = .data[[color_col]])) +
+    stat_ecdf(geom = "step") +  # Step plot for CDF
+    labs(title = paste("CDF", x_name, bsn),
+         x = paste(x_name, x_unit),
+         y = "Cumulative Probability",
+         color = "Dataset"
+    ) +
+    custom_theme() +
+    scale_color_manual(
+      values = plot_info[[color_col]]$colors,
+      labels = plot_info[[color_col]]$labels
+    ) +
+    scale_x_continuous(
+      limits = c(min(dt[[value_col]]), max(dt[[value_col]]))  # Add small space on both ends
+    )
+  
+  # Save the plot
+  save_dir <- file.path(here::here(), "Plots", "Reference_Period_Analysis", "Distribution", value_col)
+  filename <- paste0("cdf_", bsn, "_", value_col, ".pdf")
+  save_plot(p, save_dir, filename, width = 8, height = 6)
+}

@@ -1,28 +1,126 @@
+library(ggplot2)
+
+custom_theme <- function() {
+  theme_minimal(base_size = 14) +
+    theme(
+      panel.grid.major.x = element_blank(),
+      panel.grid.major.y = element_line(color = "gray90"),
+      panel.grid.minor = element_blank(),
+      text = element_text(color = "black"),
+      axis.text = element_text(size = 14, color = "black"),
+      axis.title = element_text(size = 16, face = "bold", color = "black"),
+      legend.text = element_text(size = 14, color = "black"),
+      legend.title = element_text(size = 16, face = "bold", color = "black"),
+      plot.title = element_text(size = 18, face = "bold", hjust = 0.5, color = "black")
+    )
+}
+
+save_plot <- function(plot, save_dir, file_name, width = 18, height = 6) {
+  # Ensure the directory exists
+  if (!dir.exists(save_dir)) {
+    dir.create(save_dir, recursive = TRUE, showWarnings = FALSE)
+  }
+  
+  # Save the plot
+  ggsave(
+    filename = file.path(save_dir, file_name),
+    plot = plot,
+    device = "pdf",
+    width = width,
+    height = height
+  )
+}
+
 plot_info <- list(
   scenario = list(
     colors = c(
-      "O_none" = "black",      
-      "C_none" = "grey40",     
-      "R_none" = "grey70",
-      "L_none" = "lightblue",
-      "L_d" = "lightblue",     
-      "L_n" = "blue",          
-      "M_d" = "lightgreen",    
-      "M_n" = "green",         
-      "H_d" = "lightcoral",    
-      "H_n" = "red"           
+      "O" = "black",      
+      "C" = "grey40",     
+      "R" = "grey70",
+      "L" = "blue",       
+      "M" = "green",      
+      "H" = "red"         
     ),
     labels = c(
-      "O_none" = "Observed", 
-      "C_none" = "Hindcast",  
-      "R_none" = "KNMI Ref",
-      "L_none" = "KNMI L",
-      "L_d" = "KNMI Ld",   
-      "L_n" = "KNMI Ln",   
-      "M_d" = "KNMI Md",   
-      "M_n" = "KNMI Mn",   
-      "H_d" = "KNMI Hd",   
-      "H_n" = "KNMI Hn"    
+      "O" = "Observed", 
+      "C" = "Hindcast",  
+      "R" = "KNMI Ref",
+      "L" = "KNMI L",
+      "M" = "KNMI M",
+      "H" = "KNMI H"
+    )
+  ),
+  scen_var = list(
+    colors = c(
+      "Onone" = "black",      
+      "Cnone" = "grey40",     
+      "Rnone" = "grey70",
+      "Lnone" = "lightblue",
+      "Ld" = "lightblue",     
+      "Ln" = "blue",          
+      "Md" = "lightgreen",    
+      "Mn" = "green",         
+      "Hd" = "lightcoral",    
+      "Hn" = "red"           
+    ),
+    labels = c(
+      "Onone" = "Observed", 
+      "Cnone" = "Hindcast",  
+      "Rnone" = "KNMI Ref",
+      "Lnone" = "KNMI L",
+      "Ld" = "KNMI Ld",   
+      "Ln" = "KNMI Ln",   
+      "Md" = "KNMI Md",   
+      "Mn" = "KNMI Mn",   
+      "Hd" = "KNMI Hd",   
+      "Hn" = "KNMI Hn"    
+    )
+  ),
+  scen_var_hor = list(
+    colors = c(
+      "Onone_2005" = "black",      
+      "Cnone_2005" = "grey40",     
+      "Rnone_2005" = "grey70",
+      
+      "Lnone_2033" = "lightblue", 
+      "Ld_2100" = "dodgerblue3",    # Darker blue for 2100
+      "Ln_2100" = "deepskyblue",    # Keeping `Ln` as a slightly lighter blue
+      
+      "Md_2050" = "lightgreen",    
+      "Md_2100" = "forestgreen",    # Darker green for 2100
+      "Md_2150" = "darkgreen",  # Even darker green for 2150
+      
+      "Mn_2050" = "mediumseagreen",         
+      "Mn_2100" = "seagreen",  # Slightly darker green for 2100
+      "Mn_2150" = "darkseagreen",         
+      
+      "Hd_2050" = "lightcoral",    # Light coral for 2050
+      "Hd_2100" = "firebrick",     # Darker red for 2100
+      "Hd_2150" = "darkred",       # Darkest red for 2150
+      
+      "Hn_2050" = "lightpink",     # Light pink for 2050
+      "Hn_2100" = "pink",          # Slightly darker pink for 2100
+      "Hn_2150" = "hotpink"        # Darkest pink for 2150
+    ),
+    labels = c(
+      "Onone_2005" = "Observed", 
+      "Cnone_2005" = "Hindcast", 
+      "Rnone_2005" = "KNMI Ref", 
+      "Lnone_2033" = "KNMI L (2033)", 
+      "Ld_2100" = "KNMI Ld (2100)",  
+      "Ln_2100" = "KNMI Ln (2100)",  
+      "Md_2050" = "KNMI Md (2050)",  
+      "Md_2100" = "KNMI Md (2100)",  
+      "Md_2150" = "KNMI Md (2150)",  
+      "Mn_2050" = "KNMI Mn (2050)",  
+      "Mn_2100" = "KNMI Mn (2100)",  
+      "Mn_2150" = "KNMI Mn (2150)",  
+      "Hd_2050" = "KNMI Hd (2050)",  
+      "Hd_2100" = "KNMI Hd (2100)",  
+      "Hd_2150" = "KNMI Hd (2150)",  
+      "Hn_2050" = "KNMI Hn (2050)",  
+      "Hn_2100" = "KNMI Hn (2100)",  
+      "Hn_2150" = "KNMI Hn (2150)"   
     )
   ),
   basin_info = list(
@@ -35,7 +133,7 @@ plot_info <- list(
     )
   ),
   column_info = list(
-    y_labels = c(
+    names = c(
       # routing file
       "discharge" = "Discharge",
       

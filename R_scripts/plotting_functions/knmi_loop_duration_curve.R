@@ -11,24 +11,31 @@ periods <- c("simulation") # or warmup
 
 color_col <- "scen_var_hor"
 
-basins <- c("ThS200", "Thu200", "RhB200", "Bod400")
+basins <- c("ThS200", "Thu200", "RhB200")
 
 scenarios <- c("C", "R")#, "L", "M", "H")
 
 group_cols <- c("basin", "scen_var_hor", "hydro_model")
 
 if (dataset == "mit_output") {
-  value_cols <- c("S-SNO", "P-SME", "RGES","P-uk","GLAC", "SSM", "SUZ", "SLZ")
+  value_cols <- c("RGES", "S-SNO", "P-SME", "RGES","P-uk","GLAC", "SSM", "SUZ", "SLZ")
   dt_dataset <- knmi_mit_output_dt
   
 } else if (dataset == "meteo_stat") {
   value_cols <- c("sund_avg", "tair_avg", "tair_min", "tair_max", "radg_avg", "prec_avg")#, "rhum_avg", "wspd_avg)
   dt_dataset <- knmi_meteo_stat_dt
+} else if (dataset == "discharge") {
+  basins <- "Basel"
+  value_cols <- c("discharge")
+  dt_dataset <- knmi_discharge_dt
+  #setnames(dt_dataset, "station", "basin")
+} else {
+  stop("Unknown dataset")
 }
 
 dt_subset <- dt_dataset[basin %in% basins & scenario %in% scenarios & period %in% periods]
 
-source(here("R_scripts", "plotting_functions", "plot_pdf_cdf.R"))
+source(here("R_scripts", "plotting_functions", "plot_duration_curve.R"))
 source(here("R_scripts", "plotting_functions", "knmi_plot_metadata.R"))
 
 # generate pdf, cdf plots
@@ -36,10 +43,9 @@ for (bsn in basins) {
   dt <- dt_subset[basin == bsn]
   for (value_col in value_cols) {
     if (all(is.na(dt[[value_col]]))) next
-    cat("Plotting pdf, cdf for", bsn, value_col, "\n")
+    cat("Plotting duration curve for", bsn, value_col, "\n")
     
-    plot_pdf(dt, bsn, color_col, value_col, group_cols)
-    plot_cdf(dt, bsn, color_col, value_col, group_cols)
+    plot_fdc(dt, bsn, color_col, value_col, group_cols)
   } # column loop
 } # basin loop
 

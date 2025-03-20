@@ -24,7 +24,7 @@ column_names_prevah <- c("YYYY", "MM", "DD", "Rekingen", "Untersiggenthal", "Rhe
 column_names_obse <- c("YYYY", "MM", "DD", "Basel")
 
 # Define which stations to keep (leave empty `c()` to keep all)
-selected_stations <- c("Basel")
+selected_stations <- c()
 
 gebiete <- c(
   "NoW200"

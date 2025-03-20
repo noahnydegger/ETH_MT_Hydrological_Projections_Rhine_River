@@ -1,7 +1,7 @@
 
 source(here("R_scripts", "plotting_functions", "knmi_plot_metadata.R"))
 
-plot_one_day_values <- function(dt, bsn, color_col, value_col, date_col, target_day) {
+plot_one_day_values <- function(dt, bsn, color_col, value_col, group_cols, date_col, target_day) {
   
   value_name <- plot_info$column_info$names[[value_col]]
   value_unit <- plot_info$column_info$units[[value_col]]

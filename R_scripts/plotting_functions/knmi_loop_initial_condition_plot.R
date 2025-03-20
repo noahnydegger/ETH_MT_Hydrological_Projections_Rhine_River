@@ -4,6 +4,7 @@ dataset <- "mit_output"
 show_range <- FALSE
 show_ensemble <- FALSE
 
+periods <- c("simulation") # or warmup
 
 color_col <- "scen_var_hor"
 date_col <- "date"
@@ -12,6 +13,8 @@ sel_day <- "1991-01-01"
 basins <- c("ThS200", "Thu200", "RhB200")
 
 scenarios <- c("C", "R")#, "L", "M", "H")
+
+group_cols <- c("basin", "scen_var_hor", "hydro_model")
 
 if (dataset == "mit_output") {
   value_cols <- c("S-SNO")
@@ -22,7 +25,7 @@ if (dataset == "mit_output") {
   dt_dataset <- knmi_meteo_stat_dt
 }
 
-dt_subset <- dt_dataset[basin %in% basins & scenario %in% scenarios]
+dt_subset <- dt_dataset[basin %in% basins & scenario %in% scenarios & period %in% periods]
 
 source(here("R_scripts", "plotting_functions", "plot_initial_condition.R"))
 source(here("R_scripts", "plotting_functions", "knmi_plot_metadata.R"))
@@ -34,7 +37,7 @@ for (bsn in basins) {
     if (all(is.na(dt[[value_col]]))) next
     cat("Plotting one day values for", bsn, value_col, "\n")
     
-    plot_one_day_values(dt, bsn, color_col, value_col, date_col, sel_day)
+    plot_one_day_values(dt, bsn, color_col, value_col, group_cols, date_col, sel_day)
   } # column loop
 } # basin loop
 

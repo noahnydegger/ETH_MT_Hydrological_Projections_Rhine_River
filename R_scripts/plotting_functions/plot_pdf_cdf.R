@@ -4,7 +4,7 @@ library(data.table)
 source(here("R_scripts", "plotting_functions", "knmi_plot_metadata.R"))
 
 # PDF Plot Function
-plot_pdf <- function(dt, bsn, color_col, value_col) {
+plot_pdf <- function(dt, bsn, color_col, value_col, group_cols) {
   
   value_name <- plot_info$column_info$names[[value_col]]
   value_unit <- plot_info$column_info$units[[value_col]]
@@ -33,7 +33,7 @@ plot_pdf <- function(dt, bsn, color_col, value_col) {
 }
 
 # CDF Plot Function
-plot_cdf <- function(dt, bsn, color_col, value_col) {
+plot_cdf <- function(dt, bsn, color_col, value_col, group_cols) {
   
   value_name <- plot_info$column_info$names[[value_col]]
   value_unit <- plot_info$column_info$units[[value_col]]

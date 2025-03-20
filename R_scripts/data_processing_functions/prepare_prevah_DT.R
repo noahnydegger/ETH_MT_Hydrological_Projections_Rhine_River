@@ -2,6 +2,8 @@
 # project directory
 home_dir <- file.path(here::here())
 
+read_new_data <- FALSE
+
 # input directory
 rds_input_dir <- file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output")
 
@@ -14,42 +16,58 @@ dt_variables <- c(
   )
 
 rds_files <- c(
-  "prevah_discharge_knmi.R",
-  "prevah_mit_output_knmi.R",
-  "prevah_meteo_stat_knmi.R"
+  "prevah_discharge_knmi.rds",
+  "prevah_mit_output_knmi.rds",
+  "prevah_meteo_stat_knmi.rds"
 )
 
 generating_scripts <- c(
   "read_raw_prevah_discharge_knmi.R",
+  "read_raw_prevah_allcomponents_knmi.R",
   "read_raw_prevah_allcomponents_knmi.R"
 )
 
-knmi_dt_list <- list()
+generate_new_prevah_dt <- function(dt_name, script_path) {
+  if (dt_name == "knmi_meteo_stat_dt") {
+    return()
+  } else {
+    source(script_path)
+    if (!exists(dt_name, envir = .GlobalEnv)) {
+      stop(paste("Script", script_path, "did not generate the expected variable:", dt_name))
+    }
+    message(paste("Generated", dt_name, "by running", script_path))
+  }
+}
 
-load_or_generate_data <- function(var_name, rds_path, script_path) {
-  if (!exists(var_name, envir = .GlobalEnv)) {
+read_rds_prevah_dt <- function(dt_name, rds_path) {
+  assign(dt_name, readRDS(rds_path), envir = .GlobalEnv)
+  message(paste("Loaded", dt_name, "from", rds_path))
+}
+
+load_or_generate_data <- function(dt_name, rds_path, script_path, read_new_data = FALSE) {
+  
+  # Check if read_new_data is TRUE, or the variable doesn't exist
+  if (read_new_data) {
+    generate_new_prevah_dt(dt_name, script_path)
+  }
+  else if (!exists(dt_name, envir = .GlobalEnv)) {
     if (file.exists(rds_path)) {
-      assign(var_name, readRDS(rds_path), envir = .GlobalEnv)
-      message(paste("Loaded", var_name, "from", rds_path))
+      read_rds_prevah_dt(dt_name, rds_path)
+      
     } else if (file.exists(script_path)) {
-      source(script_path)
-      if (!exists(var_name, envir = .GlobalEnv)) {
-        stop(paste("Script", script_path, "did not generate the expected variable:", var_name))
-      }
-      message(paste("Generated", var_name, "by running", script_path))
+      # If RDS doesn't exist, try to generate it by sourcing the script
+      generate_new_prevah_dt(dt_name, script_path)
     } else {
       stop(paste("Neither", rds_path, "nor", script_path, "was found."))
     }
   } else {
-    message(paste(var_name, "already exists in the environment."))
+    message(paste(dt_name, "already exists in the environment."))
   }
   
-  # Add loaded variable to knmi_dt_list list
-  knmi_dt_list[[var_name]] <<- get(var_name, envir = .GlobalEnv)
 }
 
 # Function to add 'scenario_variant' and 'scenario_variant_horizon' columns with custom ordering
-add_combined_columns <- function(dt) {
+add_scenario_horizon_grouping_columns <- function(dt) {
   dt[, scen_var := paste0(scenario, variant)]
   dt[, scen_var_hor := paste(scen_var, horizon, sep = "_")]
   
@@ -81,22 +99,83 @@ add_combined_columns <- function(dt) {
   return(dt)
 }
 
-# Function to apply add_combined_columns to each data.table in dt_list
-apply_to_dt_list <- function(dt_list) {
-  dt_list <- lapply(dt_list, add_combined_columns)
-  return(dt_list)
+add_time_period_column <- function(dt, date_col = "date", horizon_col = "horizon") {
+  dt[, period := ifelse(
+    as.numeric(format(get(date_col), "%Y")) >= get(horizon_col) - 14 &
+      as.numeric(format(get(date_col), "%Y")) <= get(horizon_col) + 15,
+    "simulation", 
+    "warmup"
+  )]
 }
 
+# Function to change row entries in a column based on old-to-new value mapping
+change_row_entries <- function(dt, column, row_value_map) {
+  # Loop through each old value and replace it with the corresponding new value
+  for (old_value in names(row_value_map)) {
+    new_value <- row_value_map[[old_value]]
+    dt[get(column) == old_value, (column) := new_value]
+  }
+
+}
+
+# Function to change column names based on a value_map (named list)
+change_column_names <- function(dt, col_value_map) {
+  # Loop through each old column name and rename it to the corresponding new name
+  for (old_name in names(col_value_map)) {
+    # Check if the old column exists in the data.table
+    if (old_name %in% names(dt)) {
+      new_name <- col_value_map[[old_name]]
+      setnames(dt, old_name, new_name)
+    } else {
+      # Print a warning if the old column does not exist
+      warning(paste("Column", old_name, "does not exist in the data.table"))
+    }
+  }
+}
+
+# load or generate the data.tables
 for (i in seq_along(dt_variables)) {
   load_or_generate_data(dt_variables[i], 
                         file.path(rds_input_dir, rds_files[i]), 
-                        file.path(generating_scripts_dir, generating_scripts[i])
+                        file.path(generating_scripts_dir, generating_scripts[i]),
+                        read_new_data = read_new_data
   )
 }
 
-knmi_dt_list <- apply_to_dt_list(knmi_dt_list)
+# add columns to the data.tables
+for (dt_name in dt_variables) {
+  if (exists(dt_name, envir = .GlobalEnv)) {
+    dt <- get(dt_name, envir = .GlobalEnv)
+    if (inherits(dt, "data.table")) {
+      add_scenario_horizon_grouping_columns(dt)
+      add_time_period_column(dt)
+    }
+  }
+}
 
-# # Filter rows between 30 year periods
-# if (!is.null(horizon)) {
-#   raw_data <- raw_data[YYYY >= horizon - 14 & YYYY <= horizon + 15]
-# }
+
+# change column and row names
+for (dt_name in dt_variables) {
+  if (exists(dt_name, envir = .GlobalEnv)) {
+    dt <- get(dt_name, envir = .GlobalEnv)
+    if (inherits(dt, "data.table")) {
+      if (dt_name == "knmi_discharge_dt") {
+        # Change column names
+        col_value_map <- c(
+          "station" = "basin"
+        )
+        change_column_names(dt, col_value_map)
+      }
+      else if (dt_name %in% c("knmi_mit_output_dt", "knmi_meteo_stat_dt")) {
+        # Change column names
+        row_value_map <- c(
+          "Bod200" = "Bod400"
+        )
+        change_row_entries(dt, "basin", row_value_map)
+      }
+        
+      add_scenario_horizon_grouping_columns(dt)  # Modified directly
+      add_time_period_column(dt)  # Modified directly
+    }
+  }
+}

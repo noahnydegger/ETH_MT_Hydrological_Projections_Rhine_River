@@ -46,7 +46,7 @@ compute_seasonality <- function(dt, group_cols, value_cols, stat = "mean", q_bot
 }
 
 # Function to plot the statistics
-plot_seasonality_ts <- function(dt, bsn, info_col, color_col, value_col, stat, q_bot = 0.10, q_top = 0.90, show_ensemble = FALSE, show_range = FALSE, gof_pairs = NULL) {
+plot_seasonality_ts <- function(dt, bsn, info_col, color_col, value_col, stat, info_text, q_bot = 0.10, q_top = 0.90, show_ensemble = FALSE, show_range = FALSE, gof_pairs = NULL) {
   
   value_name <- plot_info$column_info$names[[info_col]]
   value_unit <- plot_info$column_info$units[[info_col]]
@@ -95,7 +95,7 @@ plot_seasonality_ts <- function(dt, bsn, info_col, color_col, value_col, stat, q
   p <- p + geom_line(aes(y = .data[[stat_col]]), linewidth = 1) +
     scale_x_date(date_labels = "%b", breaks = month_labels, expand = c(0, 0)) +
     labs(
-      title = paste("30-day Moving Average", stat, value_name, bsn),
+      title = paste("30-day Moving Average", value_name, bsn, info_text),
       subtitle = subtitle_text,
       x = "Month",
       y = paste(value_name, value_unit),
@@ -116,8 +116,8 @@ plot_seasonality_ts <- function(dt, bsn, info_col, color_col, value_col, stat, q
     ) else NULL
 
   # Save the plot
-  save_dir <- file.path(here::here(), "Plots", "Reference_Period_Analysis", "bias_correction", info_col)
-  filename <- paste0("seasonality_ts_", bsn, "_", stat, "_", value_col, ifelse(show_ensemble,"ens", ""), ifelse(show_range, paste0("_Q", q_bot*100, "_Q", q_top*100), ""), ".pdf")
+  save_dir <- file.path(here::here(), "Plots", "Model_Comparison", info_col)
+  filename <- paste0("seasonality_ts_", bsn, "_", stat, "_", value_col, ifelse(show_ensemble,"ens", ""), ifelse(show_range, paste0("_Q", q_bot*100, "_Q", q_top*100), ""), info_text, ".pdf")
   save_plot(p, save_dir, filename, width = 18, height = 6)
   
 }

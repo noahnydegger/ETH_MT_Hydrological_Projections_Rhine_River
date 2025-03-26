@@ -32,6 +32,20 @@ save_plot <- function(plot, save_dir, file_name, width = 18, height = 6) {
 }
 
 plot_info <- list(
+  hydro_model = list(
+    colors = c(
+      "PREVAH" = "green",
+      "wflow_sbm" = "blue",
+      "larsim" = "red",
+      "observed" = "black"
+    ),
+    labels = c(
+      "PREVAH" = "PREVAH",
+      "wflow_sbm" = "wflow_sbm",
+      "larsim" = "larsim",
+      "observed" = "observed"
+    )
+  ),
   scenario = list(
     colors = c(
       "O" = "black",      
@@ -39,7 +53,8 @@ plot_info <- list(
       "R" = "grey70",
       "L" = "blue",       
       "M" = "green",      
-      "H" = "red"         
+      "H" = "red",
+      "none" = "grey50"
     ),
     labels = c(
       "O" = "Observed", 
@@ -47,7 +62,8 @@ plot_info <- list(
       "R" = "KNMI Ref",
       "L" = "KNMI L",
       "M" = "KNMI M",
-      "H" = "KNMI H"
+      "H" = "KNMI H",
+      "none" = "None"
     )
   ),
   scen_var = list(
@@ -61,7 +77,19 @@ plot_info <- list(
       "Md" = "lightgreen",    
       "Mn" = "green",         
       "Hd" = "lightcoral",    
-      "Hn" = "red"           
+      "Hn" = "red",
+      
+      # discharge all
+      "obs_none" = "black",      
+      "contr_none" = "grey40",     
+      "none_none" = "grey70",
+      "L_none" = "lightblue",
+      "L_dry" = "lightblue",     
+      "L_wet" = "blue",          
+      "M_dry" = "lightgreen",    
+      "M_wet" = "green",         
+      "H_dry" = "lightcoral",    
+      "H_wet" = "red"
     ),
     labels = c(
       "Onone" = "Observed", 
@@ -73,7 +101,19 @@ plot_info <- list(
       "Md" = "KNMI Md",   
       "Mn" = "KNMI Mn",   
       "Hd" = "KNMI Hd",   
-      "Hn" = "KNMI Hn"    
+      "Hn" = "KNMI Hn",
+      
+      # discharge all
+      "obs_none" = "Observed",
+      "contr_none" = "Control",
+      "none_none" = "KNMI ref",
+      "L_none" = "KNMI L",
+      "L_dry" = "KNMI L (Dry)",
+      "L_wet" = "KNMI L (Wet)",
+      "M_dry" = "KNMI M (Dry)",
+      "M_wet" = "KNMI M (Wet)",
+      "H_dry" = "KNMI H (Dry)",
+      "H_wet" = "KNMI H (Wet)"
     )
   ),
   scen_var_hor = list(
@@ -100,7 +140,32 @@ plot_info <- list(
       
       "Hn_2050" = "lightpink",     # Light pink for 2050
       "Hn_2100" = "pink",          # Slightly darker pink for 2100
-      "Hn_2150" = "hotpink"        # Darkest pink for 2150
+      "Hn_2150" = "hotpink",        # Darkest pink for 2150
+      
+      # discharge all
+      "obs_none_ref" = "black",
+      "contr_none_ref" = "grey40",
+      "none_none_ref" = "grey70",
+      
+      "L_none_2033" = "lightblue",
+      "L_dry_2100" = "dodgerblue3",    # Darker blue for 2100
+      "L_wet_2100" = "deepskyblue",    # Keeping `Ln` as a slightly lighter blue
+      
+      "M_dry_2050" = "lightgreen",
+      "M_dry_2050" = "forestgreen",    # Darker green for 2100
+      "M_dry_2100" = "darkgreen",  # Even darker green for 2150
+      
+      "M_wet_2100" = "mediumseagreen",
+      "M_wet_2150" = "seagreen",  # Slightly darker green for 2100
+      "M_wet_2150" = "darkseagreen",
+      
+      "H_dry_2050" = "lightcoral",    # Light coral for 2050
+      "H_dry_2050" = "firebrick",     # Darker red for 2100
+      "H_dry_2100" = "darkred",       # Darkest red for 2150
+      
+      "H_wet_2100" = "lightpink",     # Light pink for 2050
+      "H_wet_2150" = "pink",          # Slightly darker pink for 2100
+      "H_wet_2150" = "hotpink"        # Darkest pink for 2150
     ),
     labels = c(
       "Onone_2005" = "Observed", 
@@ -120,7 +185,27 @@ plot_info <- list(
       "Hd_2150" = "KNMI Hd (2150)",  
       "Hn_2050" = "KNMI Hn (2050)",  
       "Hn_2100" = "KNMI Hn (2100)",  
-      "Hn_2150" = "KNMI Hn (2150)"   
+      "Hn_2150" = "KNMI Hn (2150)",
+      
+      # discharge all
+      "obs_none_ref" = "Observed",
+      "contr_none_ref" = "Hindcast",
+      "none_none_ref" = "KNMI ref",
+      "L_none_2033" = "L 2033",
+      "L_dry_2100" = "L dry 2100",
+      "L_wet_2100" = "L wet 2100",
+      "M_dry_2050" = "M dry 2050",
+      "M_dry_2100" = "M dry 2100",
+      "M_dry_2150" = "M dry 2150",
+      "M_wet_2050" = "M wet 2050",
+      "M_wet_2100" = "M wet 2100",
+      "M_wet_2150" = "M wet 2150",
+      "H_dry_2050" = "H dry 2050",
+      "H_dry_2100" = "H dry 2100",
+      "H_dry_2150" = "H dry 2150",
+      "H_wet_2050" = "H wet 2050",
+      "H_wet_2100" = "H wet 2100",
+      "H_wet_2150" = "H wet 2150"
     )
   ),
   basin_info = list(

@@ -1,15 +1,15 @@
 #!/bin/bash
 
 # Define the remote and local directories
-REMOTE_DIR="nydegger@hyperion.wsl.ch:/home/nydegger/Rheinblick/R_KNMI"
-LOCAL_DIR="/Volumes/MT_case_sensitive/ETH_MT_Hydrological_Projections_Rhine_River/Data/Rheinblick2027/raw_prevah_output/R_KNMI"
+REMOTE_DIR="nydegger@hyperion.wsl.ch:/home/nydegger/Rheinblick/routing"
+LOCAL_DIR="/Volumes/MT_case_sensitive/ETH_MT_Hydrological_Projections_Rhine_River/Data/Rheinblick2027/raw_prevah_output/routing"
 
-# SSH into the remote server and find all matching folders
-folders=$(ssh nydegger@hyperion.wsl.ch "find /home/nydegger/Rheinblick/R_KNMI -type d -name 'reference_*'")
+# SSH into the remote server and find all subfolders
+folders=$(ssh nydegger@hyperion.wsl.ch "find /home/nydegger/Rheinblick/routing -mindepth 1 -maxdepth 1 -type d")
 
 # Loop through each folder and copy its content
 for folder in $folders; do
-    # Extract the folder name (e.g., reference_ens1, reference_ens2)
+    # Extract the folder name (e.g., folder1, folder2)
     folder_name=$(basename "$folder")
     
     # Define the corresponding local folder
@@ -22,13 +22,7 @@ for folder in $folders; do
     fi
 
     # Copy content from remote to local
-    rsync -avz \
-        --include='*/' \
-        --include='*.mit' \
-        --include='*.stats' \
-        --include='*.pri' \
-        --exclude='*' \
-        "nydegger@hyperion.wsl.ch:$folder/" "$local_folder/"
+    rsync -avz "nydegger@hyperion.wsl.ch:$folder/" "$local_folder/"
 
     # Check if the command was successful
     if [ $? -eq 0 ]; then

@@ -25,6 +25,8 @@ if (dataset == "mit_output") {
   dt_dataset <- knmi_meteo_stat_dt
 }
 
+basins <- unique(dt_dataset$basin)
+
 dt_subset <- dt_dataset[basin %in% basins & scenario %in% scenarios & period %in% periods]
 
 source(here("R_scripts", "plotting_functions", "plot_initial_condition.R"))

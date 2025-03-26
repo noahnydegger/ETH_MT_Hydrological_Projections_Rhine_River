@@ -142,11 +142,14 @@ for (i in seq_along(dt_variables)) {
   )
 }
 
+#dt_variables <- c("knmi_discharge_dt")
+
 # add columns to the data.tables
 for (dt_name in dt_variables) {
   if (exists(dt_name, envir = .GlobalEnv)) {
     dt <- get(dt_name, envir = .GlobalEnv)
     if (inherits(dt, "data.table")) {
+      cat("Adding columns to", dt_name, "\n")
       add_scenario_horizon_grouping_columns(dt)
       add_time_period_column(dt)
     }
@@ -157,18 +160,19 @@ for (dt_name in dt_variables) {
 # change column and row names
 for (dt_name in dt_variables) {
   if (exists(dt_name, envir = .GlobalEnv)) {
+    cat("Changing column and row names in", dt_name, "\n")
     dt <- get(dt_name, envir = .GlobalEnv)
     if (inherits(dt, "data.table")) {
       if (dt_name == "knmi_discharge_dt") {
         # Change column names
-        col_value_map <- c(
+        col_value_map <- c(  # old_name = new_name
           "station" = "basin"
         )
         change_column_names(dt, col_value_map)
       }
       else if (dt_name %in% c("knmi_mit_output_dt", "knmi_meteo_stat_dt")) {
         # Change column names
-        row_value_map <- c(
+        row_value_map <- c(  # old_value = new_value
           "Bod200" = "Bod400"
         )
         change_row_entries(dt, "basin", row_value_map)
@@ -176,6 +180,7 @@ for (dt_name in dt_variables) {
         
       add_scenario_horizon_grouping_columns(dt)  # Modified directly
       add_time_period_column(dt)  # Modified directly
+      assign(dt_name, dt, envir = .GlobalEnv)  # Reassign the modified data.table
     }
   }
 }

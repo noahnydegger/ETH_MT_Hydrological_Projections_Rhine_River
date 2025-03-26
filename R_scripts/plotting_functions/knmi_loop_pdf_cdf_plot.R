@@ -1,5 +1,5 @@
 
-dataset <- "meteo_stat"
+dataset <- "mit_output" # or meteo_stat
 
 show_range <- FALSE
 show_ensemble <- FALSE
@@ -11,20 +11,29 @@ periods <- c("simulation") # or warmup
 
 color_col <- "scen_var_hor"
 
-basins <- c("ThS200", "Thu200", "RhB200", "Bod400")
+basins <- c("ThS200")#, "Thu200", "RhB200", "Bod400")
 
 scenarios <- c("C", "R")#, "L", "M", "H")
 
 group_cols <- c("basin", "scen_var_hor", "hydro_model")
 
 if (dataset == "mit_output") {
-  value_cols <- c("S-SNO", "P-SME", "RGES","P-uk","GLAC", "SSM", "SUZ", "SLZ")
+  value_cols <- c("S-SNO", "P-SME", "RGES","GLAC", "EPOT", "EREA", "SSM", "SUZ", "SLZ")
   dt_dataset <- knmi_mit_output_dt
   
 } else if (dataset == "meteo_stat") {
   value_cols <- c("sund_avg", "tair_avg", "tair_min", "tair_max", "radg_avg", "prec_avg")#, "rhum_avg", "wspd_avg)
   dt_dataset <- knmi_meteo_stat_dt
+} else if (dataset == "discharge") {
+  basins <- "Basel"
+  value_cols <- c("discharge")
+  dt_dataset <- knmi_discharge_dt
+  #setnames(dt_dataset, "station", "basin")
+} else {
+  stop("Unknown dataset")
 }
+
+basins <- unique(dt_dataset$basin)
 
 dt_subset <- dt_dataset[basin %in% basins & scenario %in% scenarios & period %in% periods]
 

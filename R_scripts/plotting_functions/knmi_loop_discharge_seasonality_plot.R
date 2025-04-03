@@ -37,17 +37,17 @@ show_ensemble <- FALSE
 q_bot <- 0.25
 q_top <- 0.75
 
-info_text <- ""
+info_text <- "prevah"
 
-color_col <- "hydro_model"
+color_col <- "scen_var_hor"
 
-stations <- c("Basel Rheinhalle")
+stations <- c("Basel Rheinhalle") # Basel Rheinhalle
 
 horizons <- c("ref")#, "L", "M", "H")
 
-sources <- c("BfG", "BAFU")
+sources <- c("BAFU", "WSL")
 
-scen_var_hors <- c("none_none_ref", "obs_none_ref")
+scen_var_hors <- c("none_none_ref", "obs_none_ref", "contr_none_ref")
 
 gof_pairs <- NULL
 
@@ -57,7 +57,7 @@ statistics <- c("mean")#, "min", "max")
 group_cols <- c("station", "scen_var_hor", "hydro_model")
 value_cols <- c("discharge")
 
-dt_subset <- knmi_discharge_dt_all[station %in% stations & scen_var_hor %in% scen_var_hors & horizon %in% horizons]
+dt_subset <- knmi_discharge_dt_all[station %in% stations & scen_var_hor %in% scen_var_hors & horizon %in% horizons & source %in% sources]
 
 source(here("R_scripts", "plotting_functions", "plot_seasonality.R"))
 source(here("R_scripts", "plotting_functions", "knmi_plot_metadata.R"))

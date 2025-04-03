@@ -105,7 +105,7 @@ plot_info <- list(
       
       # discharge all
       "obs_none" = "Observed",
-      "contr_none" = "Control",
+      "contr_none" = "Hindcast",
       "none_none" = "KNMI ref",
       "L_none" = "KNMI L",
       "L_dry" = "KNMI L (Dry)",
@@ -275,7 +275,17 @@ plot_info <- list(
       "wspd_min" = "wind speed (min)",
       "wspd_max" = "wind speed (max)",
       "wspd_avg" = "wind speed (avg)",
-      "wspd_std" = "wind speed (std)"
+      "wspd_std" = "wind speed (std)",
+      
+      # meteo .2km files
+      "sund_abs_mean" = "sunshine duration mean (absolute)",
+      "sund_abs_max" = "sunshine duration max (absolute)",
+      "sund_rel_mean" = "sunshine duration mean (relative)",
+      "sund_rel_max" = "sunshine duration max (relative)",
+      "radg_abs_mean" = "global radiation mean (absolute)",
+      "radg_abs_max" = "global radiation max (absolute)",
+      "radg_rel_mean" = "global radiation mean (relative)",
+      "radg_rel_max" = "global radiation max (relative)"
     ),
     units = c(
       # routing file
@@ -334,7 +344,17 @@ plot_info <- list(
       "wspd_min" = "m/s",
       "wspd_max" = "m/s",
       "wspd_avg" = "m/s",
-      "wspd_std" = "m/s"
+      "wspd_std" = "m/s",
+      
+      # meteo .2km files
+      "sund_abs_mean" = "hours/d",
+      "sund_abs_max" = "hours/d",
+      "sund_rel_mean" = "%",
+      "sund_rel_max" = "%",
+      "radg_abs_mean" = "W/m²",
+      "radg_abs_mex" = "W/m²",
+      "radg_rel_mean" = "%",
+      "radg_rel_max" = "%"
     )
   )
 )

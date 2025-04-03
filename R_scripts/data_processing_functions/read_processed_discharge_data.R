@@ -10,11 +10,11 @@ input_dir_larsim <- file.path(home_dir, "Data", "Rheinblick2027", "processed_lar
 input_dir_wflow <- file.path(home_dir, "Data", "Rheinblick2027", "processed_wflow_output")
 
 station_list <- c(
-  "Basel Rheinhalle"
+  "Basel Rheinhalle", "Lobith"
 )
 
 # output directory
-output_dir <- file.path(home_dir, "Data", "Rheinblick2027", "provessed_discharge_data")
+output_dir <- file.path(home_dir, "Data", "Rheinblick2027", "processed_discharge_data")
 
 input_file_suffix_knmi <- ".csv"
 
@@ -24,7 +24,7 @@ output_file_name <- "knmi_discharge_data"
 # code to read data from each input dir -------------------------------------
 input_dirs <- c(input_dir_prevah, input_dir_larsim, input_dir_wflow)
 # Initialize an empty list to store data from each directory
-discharge_data_list <- list()
+all_discharge_data_list <- list()
 
 # Loop through each input directory
 for (dir in input_dirs) {
@@ -45,7 +45,7 @@ for (dir in input_dirs) {
     
     # Read each CSV file and append the data
     if (length(csv_files) > 0) {
-      discharge_data_list[[paste0(dir, "_", station_folder)]] <- rbindlist(
+      all_discharge_data_list[[paste0(dir, "_", station_folder)]] <- rbindlist(
         lapply(csv_files, fread), 
         fill = TRUE
       )
@@ -72,10 +72,10 @@ setcolorder(larsim_hindcast_dt, c("station", "date", "discharge", "unit",
                   "horizon", "scenario", "variant", 
                   "member", "hydro_model", "source"))
 
-discharge_data_list[[paste0(input_dir_larsim, "_hindcast")]] <- larsim_hindcast_dt
+all_discharge_data_list[[paste0(input_dir_larsim, "_hindcast")]] <- larsim_hindcast_dt
 
 # Combine all data into one long data.table
-knmi_discharge_dt_all <- rbindlist(discharge_data_list, fill = TRUE)
+knmi_discharge_dt_all <- rbindlist(all_discharge_data_list, fill = TRUE)
 
 # clean the data
 # Change values from "old" to "new"

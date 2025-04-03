@@ -84,9 +84,21 @@ for (stat in c("mean")) {
       info_col <- sub("(avg).*", "\\1", info_col)
       
       plot_seasonality_ts(dt, bsn, info_col, color_col, value_col, stat, gof_pairs = gof_pairs)
+      
     } # value_col loop
   } # basin loop
 } # stat loop
+
+source(here("R_scripts", "plotting_functions", "plot_pdf_cdf.R"))
+basins <- unique(sund_bc$basin)
+color_col <- "scen_var_hor"
+value_cols <- c("sund_avg", "sund_avg_bc_monthly", "sund_avg_bc_overall")
+for (bsn in basins) {
+  dt <- sund_bc[basin == bsn]
+  cat("Plotting cdf for", bsn, value_col, "\n")
+  
+  plot_cdf(dt, bsn, color_col, value_cols[1], value_cols[2], value_cols[3], group_cols)
+} # basin loop
 
 group_cols <- c("basin")
 value_cols <- c("sund_avg", "sund_avg_bc_monthly", "sund_avg_bc_overall")
@@ -102,3 +114,55 @@ for (dev_type in c("abs", "rel")) {
     plot_monthly_yearly_boxplots(dt_month, dt_overall, info_col, comparison_col, value_col, dev_type)
   }
 }
+
+value_cols <- c("sund_avg", "sund_avg_bc_monthly", "sund_avg_bc_overall")
+
+sund_monthly_factors <- dt_month[, .(sund_avg_abs_fac = mean(sund_avg_abs_dev, na.rm = TRUE),
+                                     sund_avg_rel_fac = mean(sund_avg_rel_dev, na.rm = TRUE)), 
+                                 by = .(MM, scen_var_hor)]
+
+sund_overall_factors <- dt_overall[, .(sund_avg_abs_fac = mean(sund_avg_abs_dev, na.rm = TRUE),
+                                       sund_avg_rel_fac = mean(sund_avg_rel_dev, na.rm = TRUE)), 
+                                   by = .(scen_var_hor)]
+
+# Define the value columns to loop over
+value_cols <- c("sund_avg", "sund_avg_bc_monthly", "sund_avg_bc_overall")
+
+# Compute the mean absolute and relative deviation factors dynamically for each value column
+sund_monthly_factors <- dt_month[, 
+                                 {
+                                   # Start with the list to store results
+                                   res <- list()
+                                   
+                                   # Loop over value_cols and calculate the factors
+                                   for (col in value_cols) {
+                                     res[[paste0(col, "_mean")]] <- mean(get(col), na.rm = TRUE)
+                                     res[[paste0(col, "_abs_fac")]] <- mean(get(paste0(col, "_abs_dev")), na.rm = TRUE)
+                                     res[[paste0(col, "_rel_fac")]] <- mean(get(paste0(col, "_rel_dev")), na.rm = TRUE)
+                                   }
+                                   
+                                   # Return the results for each group
+                                   res
+                                 }, 
+                                 by = .(MM, scen_var_hor)
+]
+
+# Compute the overall factors (mean absolute and relative factors dynamically)
+sund_overall_factors <- dt_overall[, 
+                                   {
+                                     # Start with the list to store results
+                                     res <- list()
+                                     
+                                     # Loop over value_cols and calculate the factors
+                                     for (col in value_cols) {
+                                       res[[paste0(col, "_mean")]] <- mean(get(col), na.rm = TRUE)
+                                       res[[paste0(col, "_abs_fac")]] <- mean(get(paste0(col, "_abs_dev")), na.rm = TRUE)
+                                       res[[paste0(col, "_rel_fac")]] <- mean(get(paste0(col, "_rel_dev")), na.rm = TRUE)
+                                     }
+                                     
+                                     # Return the results for each group
+                                     res
+                                   }, 
+                                   by = .(scen_var_hor)
+]
+

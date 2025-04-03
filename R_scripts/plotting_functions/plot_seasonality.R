@@ -92,7 +92,7 @@ plot_seasonality_ts <- function(dt, bsn, info_col, color_col, value_col, stat, i
     p <- p + geom_line(aes(y = .data[[stat_col]], color = .data[[color_col]]), linewidth = 0.7)
   }
 
-  p <- p + geom_line(aes(y = .data[[stat_col]]), linewidth = 1) +
+  p <- p + geom_line(aes(y = .data[[stat_col]]), linewidth = 2) +
     scale_x_date(date_labels = "%b", breaks = month_labels, expand = c(0, 0)) +
     labs(
       title = paste("30-day Moving Average", value_name, bsn, info_text),
@@ -110,16 +110,58 @@ plot_seasonality_ts <- function(dt, bsn, info_col, color_col, value_col, stat, i
       values = plot_info[[color_col]]$colors,
       labels = plot_info[[color_col]]$labels
     ) +
-    if (show_range) scale_fill_manual(
+    #ylim(750, 1500) +
+    (if (show_range) scale_fill_manual(
       values = plot_info[[color_col]]$colors,
       labels = plot_info[[color_col]]$labels
-    ) else NULL
+    ) else NULL)
+    
 
   # Save the plot
-  save_dir <- file.path(here::here(), "Plots", "Model_Comparison", info_col)
+  save_dir <- file.path(here::here(), "Plots", "Reference_Period_Analysis", "bias_correction", "seasonality", info_col)
   filename <- paste0("seasonality_ts_", bsn, "_", stat, "_", value_col, ifelse(show_ensemble,"ens", ""), ifelse(show_range, paste0("_Q", q_bot*100, "_Q", q_top*100), ""), info_text, ".pdf")
   save_plot(p, save_dir, filename, width = 18, height = 6)
   
+}
+
+plot_seasonality_bars <- function(dt, bsn, info_col, color_col, value_col, stat, info_text) {
+  
+  value_name <- plot_info$column_info$names[[info_col]]
+  value_unit <- plot_info$column_info$units[[info_col]]
+  
+  stat_col <- paste0(stat, "_", value_col)
+  
+  # Extract month from DayOfYear (assumes 2023 calendar for mapping)
+  dt[, month := format(as.Date(DayOfYear - 1, origin = "2023-01-01"), "%b")]
+  dt[, month := factor(month, levels = format(seq(as.Date("2023-01-01"), by = "1 month", length.out = 12), "%b"))]
+  
+  # Plot
+  p <- ggplot(dt, aes(
+    x = month,
+    y = .data[[stat_col]],
+    fill = .data[[color_col]],
+    group = .data[[color_col]]
+  )) +
+    geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+    labs(
+      title = paste("Monthly", stat, value_name, "in", bsn, info_text),
+      x = "Month",
+      y = paste(value_name, value_unit),
+      fill = "Dataset"
+    ) +
+    custom_theme() +
+    scale_fill_manual(
+      values = plot_info[[color_col]]$colors,
+      labels = plot_info[[color_col]]$labels
+    ) +
+    theme(
+      axis.title.x = element_blank()
+    )
+  
+  # Save the plot
+  save_dir <- file.path(here::here(), "Plots", "Reference_Period_Analysis", "bias_correction", "seasonality", info_col)
+  filename <- paste0("seasonality_bar_", bsn, "_", stat, "_", value_col, info_text, ".pdf")
+  save_plot(p, save_dir, filename, width = 14, height = 6)
 }
 
 

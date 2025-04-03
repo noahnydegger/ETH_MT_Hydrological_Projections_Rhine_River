@@ -234,6 +234,9 @@ if (!dir.exists(output_dir)) {
 }
 
 # export processed data --------------------------------------------------
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+}
 # Export to .RDS format
 saveRDS(knmi_discharge_dt, file.path(output_dir, paste0(output_file_name, ".rds")))
 

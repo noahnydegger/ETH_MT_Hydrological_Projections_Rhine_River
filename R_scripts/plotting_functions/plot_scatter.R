@@ -13,7 +13,7 @@ plot_scatter_xy <- function(dt, bsn, color_col, value_col_x, value_col_y, group)
   p <- ggplot(dt, aes(x = .data[[value_col_x]], y = .data[[value_col_y]], color = .data[[color_col]])) +
     geom_point(alpha = 0.7, size = 2) +
     labs(
-      title = paste(value_col_x, "vs", value_col_y, "in", bsn),
+      title = paste(plot_info[[color_col]]$labels[group]),
       x = paste(x_name, x_unit),
       y = paste(y_name, y_unit),
       color = "Dataset"
@@ -53,9 +53,9 @@ plot_scatter_group <- function(dt, bsn, color_col, value_col, group_col, groups)
   p <- ggplot(scatter_dt, aes(x = x, y = y)) +
     geom_point(alpha = 0.7, size = 2, color = "steelblue") +
     labs(
-      title = paste("Spread comparison:", groups[2], "vs", groups[1], "for", value_name, "in", bsn),
-      x = paste(groups[1], value_name, value_unit),
-      y = paste(groups[2], value_name, value_unit)
+      title = paste(value_name, value_unit),
+      x = paste(plot_info[[color_col]]$labels[groups[1]]),
+      y = paste(plot_info[[color_col]]$labels[groups[2]])
     ) +
     custom_theme()
   

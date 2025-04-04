@@ -285,7 +285,10 @@ plot_info <- list(
       "radg_abs_mean" = "global radiation mean (absolute)",
       "radg_abs_max" = "global radiation max (absolute)",
       "radg_rel_mean" = "global radiation mean (relative)",
-      "radg_rel_max" = "global radiation max (relative)"
+      "radg_rel_max" = "global radiation max (relative)",
+      "sund_rel_mean_z" = "sunshine duration mean (relative z-score)",
+      "sund_rel_mean_logit" = "sunshine duration mean (relative logit)",
+      "sund_rel_mean_bc_logit" = "sunshine duration mean (relative logit bias corrected)"
     ),
     units = c(
       # routing file
@@ -352,9 +355,12 @@ plot_info <- list(
       "sund_rel_mean" = "%",
       "sund_rel_max" = "%",
       "radg_abs_mean" = "W/m²",
-      "radg_abs_mex" = "W/m²",
+      "radg_abs_max" = "W/m²",
       "radg_rel_mean" = "%",
-      "radg_rel_max" = "%"
+      "radg_rel_max" = "%",
+      "sund_rel_mean_z" = "",
+      "sund_rel_mean_logit" = "",
+      "sund_rel_mean_bc_logit" = ""
     )
   )
 )

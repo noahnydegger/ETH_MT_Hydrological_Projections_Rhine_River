@@ -33,24 +33,26 @@ add_scenario_horizon_grouping_columns(knmi_meteo_rast_dt)
 
 dt_dataset <- knmi_meteo_rast_dt
 
-color_col <- "scen_var_hor"
-
 basins <- c("hydro_CH")#, "Thu200", "RhB200", "Bod400")
 
 scenarios <- c("none", "contr")#, "L", "M", "H")
-
-value_cols <- c("sund_abs", "sund_rel", "radg_abs")
-group_cols <- c("scen_var_hor")
 
 gof_pairs <- c("contr_none_ref", "none_none_ref")
 info_text <- ""
 
 dt_subset <- dt_dataset[basin %in% basins & scenario %in% scenarios]
 
-source(here("R_scripts", "plotting_functions", "plot_pdf_cdf.R"))
 source(here("R_scripts", "plotting_functions", "knmi_plot_metadata.R"))
 
-# generate pdf, cdf plots
+
+# cdf pdf plots --------------------------------------------------
+source(here("R_scripts", "plotting_functions", "plot_pdf_cdf.R"))
+
+value_cols <- c("sund_abs_mean", "sund_abs_max", "sund_rel_mean", "sund_rel_max",
+                "radg_abs_mean", "radg_abs_max", "radg_rel_mean", "radg_rel_max")
+group_cols <- c("scen_var_hor")
+color_col <- "scen_var_hor"
+
 for (bsn in basins) {
   dt <- dt_subset[basin == bsn]
   for (value_col in value_cols) {
@@ -66,7 +68,8 @@ for (bsn in basins) {
 # scatter plots -------------------------------------------------
 source(here("R_scripts", "plotting_functions", "plot_scatter.R"))
 
-value_cols <- c("radg_abs_mean" = "sund_abs_mean", "radg_rel_mean" = "sund_rel_mean")
+value_cols <- c("radg_abs_mean" = "sund_abs_mean", "radg_rel_mean" = "sund_rel_mean",
+                "radg_abs_max" = "sund_abs_max", "radg_rel_max" = "sund_rel_max")
 color_col <- "scen_var_hor"
 group_cols <- c("scen_var_hor")
 group_list <- c("none_none_ref", "contr_none_ref")

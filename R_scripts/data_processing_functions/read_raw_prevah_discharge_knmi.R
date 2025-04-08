@@ -13,25 +13,28 @@ input_dir_obse <- file.path(home_dir, "Data", "Rheinblick2027", "discharge_measu
 output_dir <- file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output")
 
 input_file_prefix_knmi <- "Swissrhine200_"
+input_file_prefix_knmi <- "Thur200_"
 input_file_suffix_knmi <- ".dat"
 
 input_file_hind <- "Swissrhine200_CTRL_RUN_WSL_F_2021_g73.dat"
 input_file_obse <- "2289.daily.mean.dat" # Basel station 
 
-output_file_name <- "prevah_discharge_knmi"
+output_file_name <- "prevah_discharge_Andelfinden_knmi"
 
 column_names_prevah <- c("YYYY", "MM", "DD", "Rekingen", "Untersiggenthal", "Rheinfelden", "Basel Rheinhalle", "Wiese")
+column_names_prevah <- c("YYYY", "MM", "DD", "hal", "mur", "rem", "Andelfingen")
 column_names_obse <- c("YYYY", "MM", "DD", "Basel Rheinhalle")
 
 # Define which stations to keep (leave empty `c()` to keep all)
 selected_stations <- c()
 
 gebiete <- c(
-  "NoW200"
+  "Thu200" # NoW200
 )
 
 scenarios <- c(
   "reference"
+  #"Hd_2100", "Hn_2100"
 )
 
 # functions ---------------------------------------------------------------
@@ -200,31 +203,31 @@ for (geb in gebiete) {
   }
 }
 
-# hindcast data
-data_file <- file.path(input_dir_hind, input_file_hind)
-discharge_long <- process_discharge_data(data_file, column_names_prevah, selected_stations, 
-                       horizon = "ref", 
-                       scenario = "contr", # for control run
-                       variant = "none",
-                       member = 1,
-                       hydro_model = "PREVAH",
-                       source = "WSL")
-
-# Append to the list
-discharge_data_list[[length(discharge_data_list) + 1]] <- discharge_long
-
-# observed data
-data_file <- file.path(input_dir_obse, input_file_obse)
-discharge_long <- process_discharge_data(data_file, column_names_obse, selected_stations, 
-                       horizon = "ref", 
-                       scenario = "obs", 
-                       variant = "none",
-                       member = 1,
-                       hydro_model = "observed",
-                       source = "BAFU")
-
-# Append to the list
-discharge_data_list[[length(discharge_data_list) + 1]] <- discharge_long
+# # hindcast data
+# data_file <- file.path(input_dir_hind, input_file_hind)
+# discharge_long <- process_discharge_data(data_file, column_names_prevah, selected_stations, 
+#                        horizon = "ref", 
+#                        scenario = "contr", # for control run
+#                        variant = "none",
+#                        member = 1,
+#                        hydro_model = "PREVAH",
+#                        source = "WSL")
+# 
+# # Append to the list
+# discharge_data_list[[length(discharge_data_list) + 1]] <- discharge_long
+# 
+# # observed data
+# data_file <- file.path(input_dir_obse, input_file_obse)
+# discharge_long <- process_discharge_data(data_file, column_names_obse, selected_stations, 
+#                        horizon = "ref", 
+#                        scenario = "obs", 
+#                        variant = "none",
+#                        member = 1,
+#                        hydro_model = "observed",
+#                        source = "BAFU")
+# 
+# # Append to the list
+# discharge_data_list[[length(discharge_data_list) + 1]] <- discharge_long
 
 # Combine all knmi data into a single data.table
 knmi_discharge_dt <- rbindlist(discharge_data_list, use.names = TRUE, fill = TRUE)

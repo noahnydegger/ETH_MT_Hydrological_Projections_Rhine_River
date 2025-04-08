@@ -10,6 +10,8 @@ compute_rolling_stats <- function(dt, group_cols, value_cols, stat = "mean", wid
   # Create a copy of the data to avoid modifying the original
   dt <- copy(dt)
   
+  group_cols <- c(group_cols, "member")
+  
   # Compute rolling statistic for each column in value_cols
   dt[, paste0("rm_", value_cols) := lapply(.SD, function(x) zoo::rollapply(
     x, 
@@ -110,7 +112,7 @@ plot_seasonality_ts <- function(dt, bsn, info_col, color_col, value_col, stat, i
       values = plot_info[[color_col]]$colors,
       labels = plot_info[[color_col]]$labels
     ) +
-    #ylim(750, 1500) +
+    ylim(750, 1500) +
     (if (show_range) scale_fill_manual(
       values = plot_info[[color_col]]$colors,
       labels = plot_info[[color_col]]$labels
@@ -118,7 +120,7 @@ plot_seasonality_ts <- function(dt, bsn, info_col, color_col, value_col, stat, i
     
 
   # Save the plot
-  save_dir <- file.path(here::here(), "Plots", "Reference_Period_Analysis", "bias_correction", "seasonality", info_col)
+  save_dir <- file.path(here::here(), "Plots", "Model_Comparison", info_col)
   filename <- paste0("seasonality_ts_", bsn, "_", stat, "_", value_col, ifelse(show_ensemble,"ens", ""), ifelse(show_range, paste0("_Q", q_bot*100, "_Q", q_top*100), ""), info_text, ".pdf")
   save_plot(p, save_dir, filename, width = 18, height = 6)
   

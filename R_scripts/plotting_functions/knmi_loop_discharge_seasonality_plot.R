@@ -1,3 +1,5 @@
+library(data.table)
+library(here)
 
 add_scenario_horizon_grouping_columns <- function(dt) {
   dt[, scen_var := paste(scenario, variant, sep = "_")]
@@ -30,6 +32,7 @@ add_scenario_horizon_grouping_columns <- function(dt) {
   dt[, scen_var_hor := factor(scen_var_hor, levels = scen_var_hor_order)]
 }
 
+#knmi_discharge_dt_all <- as.data.table(readRDS(file.path(here::here(),"Data", "Rheinblick2027", "processed_discharge_data", "knmi_discharge_data.rds")))
 add_scenario_horizon_grouping_columns(knmi_discharge_dt_all)
 
 show_range <- FALSE
@@ -37,17 +40,17 @@ show_ensemble <- FALSE
 q_bot <- 0.25
 q_top <- 0.75
 
-info_text <- "prevah"
+info_text <- "models_ensmem"
 
-color_col <- "scen_var_hor"
+color_col <- "hydro_model"
 
 stations <- c("Basel Rheinhalle") # Basel Rheinhalle
 
 horizons <- c("ref")#, "L", "M", "H")
 
-sources <- c("BAFU", "WSL")
+sources <- c("BAFU", "WSL", "BfG", "Deltares")
 
-scen_var_hors <- c("none_none_ref", "obs_none_ref", "contr_none_ref")
+scen_var_hors <- c("none_none_ref", "obs_none_ref")
 
 gof_pairs <- NULL
 

@@ -53,6 +53,8 @@ value_cols <- c("sund_abs_mean", "sund_abs_max", "sund_rel_mean", "sund_rel_max"
 group_cols <- c("scen_var_hor")
 color_col <- "scen_var_hor"
 
+value_cols <- c("sund_rel_mean_bc_logit", "sund_rel_mean_z", "sund_rel_mean_logit")
+
 for (bsn in basins) {
   dt <- dt_subset[basin == bsn]
   for (value_col in value_cols) {
@@ -106,7 +108,7 @@ for (bsn in basins) {
 } # basin loop
 
 
-
+# seasonality plots ---------------------------------------------
 source(here("R_scripts", "plotting_functions", "plot_seasonality.R"))
 
 # Compute rolling statistics
@@ -130,6 +132,64 @@ for (stat in c("mean")) {
   } # basin loop
 } # stat loop
 
+# standardize -------------------------------------------------
+
+scale_cols <- c("sund_rel_mean")
+group_cols <- c("scen_var_hor")
+
+dt_subset[, (paste0(scale_cols, "_z")) := lapply(.SD, function(x)
+  (x - mean(x, na.rm = TRUE)) / sd(x, na.rm = TRUE)),
+  by = scen_var_hor,
+  .SDcols = scale_cols
+]
+
+scale_cols <- c("sund_rel_mean")
+group_cols <- c("scen_var_hor")
+eps <- 1e-6  # to avoid log(0)
+
+dt_subset[, (paste0(scale_cols, "_logit")) := lapply(.SD, function(x) {
+  x <- pmax(pmin(x, 1 - eps), eps)  # clamp to (eps, 1 - eps)
+  log(x / (1 - x))
+}),
+by = c(group_cols),
+.SDcols = scale_cols]
+
+# bias correction ------------------------------------------------
+value_col <- "sund_rel_mean"
+group_col <- "scen_var_hor"
+group_list <- c("contr_none_ref", "none_none_ref")  # group 1 is reference
+eps <- 1e-6
+
+# Step 1: Logit transform (clamped to avoid Inf)
+dt_subset[, paste0(value_col, "_logit") := {
+  x <- get(value_col)
+  x <- pmin(pmax(x, eps), 1 - eps)
+  log(x / (1 - x))
+}]
+
+# Step 2: Compute mean difference in logit space between the two groups
+mean_diff <- dt_subset[get(group_col) == group_list[2],
+                       mean(get(paste0(value_col, "_logit")), na.rm = TRUE)] -
+  dt_subset[get(group_col) == group_list[1],
+            mean(get(paste0(value_col, "_logit")), na.rm = TRUE)]
+
+# Step 3: Create _logit_shifted column for both groups
+logit_col <- paste0(value_col, "_logit")
+logit_shifted_col <- paste0(value_col, "_logit_shifted")
+
+# For group 1: copy original logit values
+dt_subset[get(group_col) == group_list[1],
+          (logit_shifted_col) := get(logit_col)]
+
+# For group 2: apply mean correction
+dt_subset[get(group_col) == group_list[2],
+          (logit_shifted_col) := get(logit_col) - mean_diff]
+
+# Step 4: Inverse logit back to probability scale
+dt_subset[!is.na(get(logit_shifted_col)),
+          paste0(value_col, "_bc_logit") := 1 / (1 + exp(-get(logit_shifted_col)))]
+
+# compute statistics ------------------------------------------
 dt_mean <- dt_subset[, lapply(.SD, mean, na.rm = TRUE), by = group_cols, .SDcols = value_cols]
 
 # Step 1: Sum by year + group

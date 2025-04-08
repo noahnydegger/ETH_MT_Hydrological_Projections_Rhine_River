@@ -56,22 +56,33 @@ read_chain_meteo <- function(chain, meteo_dir, meteo_variables) {
       meteo_dt <- meteo_dt[YYYY >= 1981]
       
       # Create a proper Date column
-      meteo_dt[, Date := as.Date(sprintf("%04d-%02d-%02d", YYYY, MM, DD))]
+      meteo_dt[, date := as.Date(sprintf("%04d-%02d-%02d", YYYY, MM, DD))]
       
       # Keep only Date and the statistics columns
       stats_cols <- c("MIN", "MAX", "AVG", "STDEV")
       existing_cols <- intersect(stats_cols, names(meteo_dt))
-      meteo_dt <- meteo_dt[, c("Date", existing_cols), with = FALSE]
+      meteo_dt <- meteo_dt[, c("date", existing_cols), with = FALSE]
       
-      # Rename the statistic columns with the new prefix
-      setnames(meteo_dt, existing_cols, paste0(new_prefix, "_", existing_cols))
+      # Map STDEV to std, others to lowercase
+      stat_renames <- tolower(existing_cols)
+      stat_renames[stat_renames == "stdev"] <- "std"
+      
+      # Rename with prefix
+      setnames(
+        meteo_dt,
+        old = existing_cols,
+        new = paste0(new_prefix, "_", stat_renames)
+      )
+      
+      # Add basin column
+      meteo_dt[, basin := "ThS200"]
       
       all_vars_dt[[new_prefix]] <- meteo_dt
     }
   }
   
   # Merge all variables by Date
-  final_dt <- Reduce(function(x, y) merge(x, y, by = "Date", all = TRUE), all_vars_dt)
+  final_dt <- Reduce(function(x, y) merge(x, y, by = "date", all = TRUE), all_vars_dt)
   
   # Add chain column
   final_dt[, chain := chain]

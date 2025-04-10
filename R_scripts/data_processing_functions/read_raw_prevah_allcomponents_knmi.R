@@ -18,12 +18,16 @@ meteo_stat_file_suffix_hind <- "_full.stat"
 output_name_mit_output <- "prevah_mit_output_knmi"
 output_name_meteo_stat <- "prevah_meteo_stat_knmi"
 
-scenario_horizons <- c(
+all_scenario_horizons <- c(
   "reference", 
   "L_2033",
   "Md_2050", "Mn_2050", "Hd_2050", "Hn_2050",
   "Ld_2100", "Ln_2100", "Md_2100", "Mn_2100", "Hd_2100", "Hn_2100",
   "Md_2150", "Mn_2150", "Hd_2150", "Hn_2150"
+)
+
+scenario_horizons <- c(
+  "reference"
 )
 
 ensembles <- paste0("ens", 1:8)
@@ -50,8 +54,7 @@ no_knmi_gebiete <- c(
   "AaB200", "AaH200", "AaU200", "ASe200", "CH_200", "Inn200", "JBN200", "ReM200", "Rho200", "Tic200", "TTB200" # routing
 )
 
-source(here("R_scripts", "data_import_functions.R"))
-
+# functions -------------------------------------------------
 read_raw_data <- function(file_path) {
   # Read the raw discharge data from the file
   raw_data <- fread(file_path)
@@ -69,8 +72,6 @@ process_mit_data <- function(data_file, horizon, scenario, variant, member, ezg)
     # Read the discharge data
     mit_data <- read_raw_data(data_file)
     
-    value_columns <- setdiff(names(mit_data), c("YYYY", "MM", "DD", "date"))
-    
     # Add metadata columns for this specific folder
     mit_data[, `:=`(
       horizon = horizon,
@@ -78,11 +79,27 @@ process_mit_data <- function(data_file, horizon, scenario, variant, member, ezg)
       variant = variant,
       member = member,
       hydro_model = "PREVAH",
+      source = "WSL",
       basin = ezg
     )]
     
+    mit_data <- add_scenario_horizon_grouping_columns(mit_data)
+    mit_data <- add_time_period_column(mit_data)
+    
+    prevah_date_cols <- c("YYYY", "MM", "DD")
+    prevah_general_cols <- c("basin")
+    rblick_date_cols <- c("date")
+    rblick_cols <- c("horizon", "scenario", "variant", "member", "scen_var", "scen_var_hor", "period", "hydro_model", "source")
+    
+    non_value_col <- c(prevah_date_cols, prevah_general_cols, rblick_date_cols, rblick_cols)
+    
+    value_cols <- setdiff(names(mit_data), non_value_col)
+    
     # Select required columns in correct order
-    mit_data <- mit_data[, c("basin", "date", "horizon", "scenario", "variant", "member", "hydro_model", value_columns), with = FALSE]
+    col_order <- c(prevah_general_cols, rblick_date_cols, rblick_cols, value_cols)
+    
+    # Select required columns in correct order
+    mit_data <- mit_data[, col_order, with = FALSE]
     
     return(mit_data)
     
@@ -119,6 +136,7 @@ process_meteo_stats_data <- function(ezg_dir, meteo_variables, meteo_stat_file_s
         variant = variant,
         member = member,
         hydro_model = "PREVAH",
+        source = "WSL",
         basin = ezg
       )]
       
@@ -138,14 +156,109 @@ process_meteo_stats_data <- function(ezg_dir, meteo_variables, meteo_stat_file_s
     }
   } # meteo_variables loop
   
-  value_columns <- setdiff(names(all_meteo_data_dt), c("YYYY", "MM", "DD", "basin", "date", "horizon", "scenario", "variant", "member", "hydro_model"))
+  all_meteo_data_dt <- add_scenario_horizon_grouping_columns(all_meteo_data_dt)
+  all_meteo_data_dt <- add_time_period_column(all_meteo_data_dt)
+  
+  prevah_date_cols <- c("YYYY", "MM", "DD")
+  prevah_general_cols <- c("basin")
+  rblick_date_cols <- c("date")
+  rblick_cols <- c("horizon", "scenario", "variant", "member", "scen_var", "scen_var_hor", "period", "hydro_model", "source")
+  
+  non_value_col <- c(prevah_date_cols, prevah_general_cols, rblick_date_cols, rblick_cols)
+  
+  value_cols <- setdiff(names(all_meteo_data_dt), non_value_col)
+  
   # Select required columns in correct order
-  all_meteo_data_dt <- all_meteo_data_dt[, c("basin", "date", "horizon", "scenario", "variant", "member", "hydro_model", value_columns), with = FALSE]
+  col_order <- c(prevah_general_cols, rblick_date_cols, rblick_cols, value_cols)
+  all_meteo_data_dt <- all_meteo_data_dt[, col_order, with = FALSE]
   
   
   return(all_meteo_data_dt)
 }
 
+# Function to add 'scenario_variant' and 'scenario_variant_horizon' columns with custom ordering
+add_scenario_horizon_grouping_columns <- function(dt) {
+  dt[, scen_var := paste(scenario, variant, sep = "_")]
+  dt[, scen_var_hor := paste(scen_var, horizon, sep = "_")]
+  
+  # Define custom order for scenario
+  scenario_order <- c("H", "M", "L", "none")
+  
+  # Define custom order for scen_var (including the variants: dry, wet, none)
+  scen_var_order <- c(
+    "H_dry", "H_wet", "M_dry", "M_wet", "L_dry", "L_wet",
+    "L_none", "none_none"
+  )
+  
+  # Define custom order for scen_var_hor (with horizon)
+  scen_var_hor_order <- c(
+    "H_dry_2150", "H_dry_2100", "H_dry_2050", 
+    "H_wet_2150", "H_wet_2100", "H_wet_2050", 
+    "M_dry_2150", "M_dry_2100", "M_dry_2050", 
+    "M_wet_2150", "M_wet_2100", "M_wet_2050", 
+    "L_dry_2100",
+    "L_wet_2100",
+    "L_none_2033",
+    "none_none_ref", "none_none_hindcast", "none_none_observed"
+  )
+  
+  # Convert scen_var and scen_var_hor to factors with defined levels
+  dt[, scenario := factor(scenario, levels = scenario_order)]
+  dt[, scen_var := factor(scen_var, levels = scen_var_order)]
+  dt[, scen_var_hor := factor(scen_var_hor, levels = scen_var_hor_order)]
+  
+  return(dt)
+}
+
+add_time_period_column <- function(dt, date_col = "date", horizon_col = "horizon", default_horizon = 2005) {
+  # Get the numeric year from the date column
+  dt[, year := as.numeric(format(get(date_col), "%Y"))]
+  
+  # Convert horizon to numeric and use default if conversion fails
+  dt[, horizon_num := as.numeric(get(horizon_col))]
+  dt[is.na(horizon_num), horizon_num := default_horizon]
+  
+  # Classify period
+  dt[, period := ifelse(
+    year >= horizon_num - 14 & year <= horizon_num + 15,
+    "simulation",
+    "warmup"
+  )]
+  
+  # Optional cleanup
+  dt[, c("year", "horizon_num") := NULL]
+  
+  return(dt)
+}
+
+# Function to change row entries in a column based on old-to-new value mapping
+change_row_entries <- function(dt, column, row_value_map) {
+  # Loop through each old value and replace it with the corresponding new value
+  for (old_value in names(row_value_map)) {
+    new_value <- row_value_map[[old_value]]
+    dt[get(column) == old_value, (column) := new_value]
+  }
+  
+  return(dt)
+}
+
+export_to_rds_csv <- function(dt, output_dir, source_folder, scen_hor) {
+  
+  output_dir <- file.path(output_dir, source_folder)
+  
+  # Ensure the output directory exists
+  if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+  
+  # Export to .RDS format
+  saveRDS(dt, file.path(output_dir, paste0(scen_hor, "_", source_folder, ".rds")))
+  
+  # Export to CSV
+  write.csv2(dt, file.path(output_dir, paste0(scen_hor, "_", source_folder, ".csv")), row.names = FALSE, quote = FALSE)
+  
+  cat(scen_hor, source_folder ,"exported", "\n")
+}
+
+# code --------------------------------------------------
 cat("Processing knmi_mit_output from:", input_dir_knmi, "\n")
 
 # Initialize an empty list to store the data.tables
@@ -167,20 +280,22 @@ for (scen in scenario_horizons) {
   
   cat("Processing scenario-horizon:", scen, "\n")
   
+  scenario_mit_output_list <- list()
+  scenario_meteo_stat_list <- list()
+  
   if (scen == "reference") {
-    scenario <- "R"
-    horizon <- 2005
+    scenario <- "none"
+    horizon <- "ref"
   } else {
     scenario <- substr(scen, 1, 1)
     horizon <- as.numeric(sub(".*([0-9]{4})$", "\\1", scen))
   }
   
   # Extract `variant` (2nd character of scenario, "d", "n", or "none")
-  variant <- ifelse(nchar(scen) >= 2 && substr(scen, 2, 2) %in% c("d", "n"), substr(scen, 2, 2), "none")
-  
-  # # Create an entry for the scenario in the output list
-  # knmi_mit_output_list[[scen]] <- list()
-  # knmi_meteo_stat_list[[scen]] <- list()
+  variant <- ifelse(nchar(scen) >= 2 & substr(scen, 2, 2) == "d", 
+                    "dry", 
+                    ifelse(substr(scen, 2, 2) == "n", "wet", 
+                           "none"))
   
   # Loop over matching folders
   for (scen_ensm_dir in matching_folders) {
@@ -189,9 +304,6 @@ for (scen in scenario_horizons) {
     # Extract the ensemble member number (ens1 to ens8) as a numeric value and as a string
     member <- as.numeric(sub(".*_ens([1-8])$", "\\1", basename(scen_ensm_dir)))
     ensm <- paste0("ens", member)
-    
-    # knmi_mit_output_list[[scen]][[ensm]] <- list()
-    # knmi_meteo_stat_list[[scen]][[ensm]] <- list()
     
     # List all subfolders (gebiete) in the matched scenario-ensemble folder
     gebiete_folders <- list.dirs(scen_ensm_dir, recursive = FALSE)
@@ -207,24 +319,42 @@ for (scen in scenario_horizons) {
       
       # Append this to the list of all mit data
       all_mit_data_list[[length(all_mit_data_list) + 1]] <- mit_data
+      scenario_mit_output_list[[length(scenario_mit_output_list) + 1]] <- mit_data
       
       if (!(ezg %in% no_meteo_gebiete)) {
         # Process meteo statistics data
         all_meteo_data_dt <- process_meteo_stats_data(ezg_dir, meteo_variables_knmi, meteo_stat_file_suffix_knmi, horizon, scenario, variant, member, ezg)
         
         all_meteo_data_list[[length(all_meteo_data_list) + 1]] <- all_meteo_data_dt
+        scenario_meteo_stat_list[[length(scenario_meteo_stat_list) + 1]] <- all_meteo_data_dt
         
       } # no_meteo_gebiete check
     } # gebiete_folders loop
   } # scen_ensm loop
+  
+  # combine ens data to one data.table, add columns
+  # export dt to .RDS and .csv
+  export_to_rds_csv(
+    rbindlist(scenario_mit_output_list), 
+    output_dir, 
+    "mit_output", 
+    scen
+  )
+  export_to_rds_csv(
+    rbindlist(scenario_meteo_stat_list), 
+    output_dir, 
+    "meteo_stat", 
+    scen
+  )
 } # scenario_horizons loop
 
 # hindcast data
 cat("Processing hindcast data\n")
-horizon <- 2005
-scenario <- "C" # for control run
+horizon <- "horizon"
+scenario <- "none" # for control run
 variant <- "none"
-member <- 1
+member <- "none"
+
 # List all subfolders (gebiete) in the matched scenario-ensemble folder
 gebiete_folders <- list.dirs(input_dir_hind, recursive = FALSE)
 # Loop over the gebiete folders
@@ -259,18 +389,38 @@ for (ezg_dir in gebiete_folders) {
   } # no_meteo_gebiete check
 } # gebiete_folders loop
 
-# Combine all the data.tables into one long data.table
-knmi_mit_output_dt <- rbindlist(all_mit_data_list)
-knmi_meteo_stat_dt <- rbindlist(all_meteo_data_list)
+row_value_map <- c(  # old_value = new_value
+  "Bod200" = "Bod400"
+)
+mit_data <- change_row_entries(mit_data, "basin", row_value_map)
+all_meteo_data_dt <- change_row_entries(all_meteo_data_dt, "basin", row_value_map)
 
-if (!dir.exists(output_dir)) {
-  dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
-}
+# add columns and export
+export_to_rds_csv(
+  mit_data, 
+  output_dir, 
+  "mit_output", 
+  "hindcast"
+)
+export_to_rds_csv(
+  all_meteo_data_dt, 
+  output_dir, 
+  "meteo_stat", 
+  "hindcast"
+)
 
-# Export to CSV
-write.csv2(knmi_mit_output_dt, file.path(output_dir, paste0(output_name_mit_output, ".csv")), row.names = FALSE, quote = FALSE)
-write.csv2(knmi_meteo_stat_dt, file.path(output_dir, paste0(output_name_meteo_stat, ".csv")), row.names = FALSE, quote = FALSE)
-
-# Export to .RDS format
-saveRDS(knmi_mit_output_dt, file.path(output_dir, paste0(output_name_mit_output, ".rds")))
-saveRDS(knmi_meteo_stat_dt, file.path(output_dir, paste0(output_name_meteo_stat, ".rds")))
+# # Combine all the data.tables into one long data.table
+# knmi_mit_output_dt <- rbindlist(all_mit_data_list)
+# knmi_meteo_stat_dt <- rbindlist(all_meteo_data_list)
+# 
+# if (!dir.exists(output_dir)) {
+#   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+# }
+# 
+# # Export to CSV
+# write.csv2(knmi_mit_output_dt, file.path(output_dir, paste0(output_name_mit_output, ".csv")), row.names = FALSE, quote = FALSE)
+# write.csv2(knmi_meteo_stat_dt, file.path(output_dir, paste0(output_name_meteo_stat, ".csv")), row.names = FALSE, quote = FALSE)
+# 
+# # Export to .RDS format
+# saveRDS(knmi_mit_output_dt, file.path(output_dir, paste0(output_name_mit_output, ".rds")))
+# saveRDS(knmi_meteo_stat_dt, file.path(output_dir, paste0(output_name_meteo_stat, ".rds")))

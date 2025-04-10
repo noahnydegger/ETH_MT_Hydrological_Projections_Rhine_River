@@ -26,9 +26,7 @@ scenario_horizons <- c(
   "Md_2150", "Mn_2150", "Hd_2150", "Hn_2150"
 )
 
-ensenmbles <- c(
-  "ens1", "ens2", "ens3", "ens4", "ens5", "ens6", "ens7", "ens8"
-)
+ensembles <- paste0("ens", 1:8)
 
 meteo_variables_knmi <- c(
   "tair", "prec", "radg", "sund", "rhum", "wspd"

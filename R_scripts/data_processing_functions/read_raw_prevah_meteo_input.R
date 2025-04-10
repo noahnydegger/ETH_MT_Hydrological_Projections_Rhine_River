@@ -3,7 +3,6 @@ library(future.apply)
 library(data.table)
 library(terra)
 library(geosphere)
-library(sirad)
 
 plan(multisession, workers = 8)
 
@@ -11,9 +10,8 @@ plan(multisession, workers = 8)
 home_dir <- file.path(here::here())
 
 # input directories
-# input directories
-input_dir_knmi <- file.path(home_dir, "Data", "Rheinblick2027", "meteo", "reference")
-input_dir_hind <- file.path(home_dir, "Data", "Rheinblick2027", "meteo", "hindcast")
+input_dir_meteo <- file.path(home_dir, "Data", "Rheinblick2027", "meteo")
+input_dir_hind <- file.path(input_dir_meteo, "hindcast")
 
 # output directory
 output_dir <- file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_input")
@@ -21,6 +19,11 @@ output_dir <- file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_in
 input_file_suffix <- ".2km"
 
 output_file_name <- "prevah_meteo_input_knmi"
+
+scenario_horizons <- c(
+  "reference", 
+  "Hd_2100", "Hn_2100"
+)
 
 meteo_variables_knmi <- c(
   "sund" = "sund_rel", 

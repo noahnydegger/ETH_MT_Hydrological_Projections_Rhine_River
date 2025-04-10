@@ -26,15 +26,15 @@ column_names_prevah <- c("YYYY", "MM", "DD", "hal", "mur", "rem", "Andelfingen")
 column_names_obse <- c("YYYY", "MM", "DD", "Basel Rheinhalle")
 
 # Define which stations to keep (leave empty `c()` to keep all)
-selected_stations <- c()
+selected_stations <- c("Andelfingen")
 
 gebiete <- c(
   "Thu200" # NoW200
 )
 
 scenarios <- c(
-  "reference"
-  #"Hd_2100", "Hn_2100"
+  "reference",
+  "Hd_2100", "Hn_2100"
 )
 
 # functions ---------------------------------------------------------------
@@ -94,12 +94,13 @@ export_discharge_data <- function(dt, output_dir) {
   # Ensure the output directory exists
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
   
-  # Add filtered date ranges
-  dt[, export_start := ifelse(horizon == "ref", as.Date("1991-01-01"), 
-                              as.Date(paste0(as.numeric(horizon) - 14, "-01-01")))]
+  # Assign start dates
+  dt[horizon == "ref", export_start := as.Date("1991-01-01")]
+  dt[horizon != "ref", export_start := as.Date(paste0(as.numeric(horizon) - 14, "-01-01"), format = "%Y-%m-%d")]
   
-  dt[, export_end := ifelse(horizon == "ref", as.Date("2020-12-31"), 
-                            as.Date(paste0(as.numeric(horizon) + 15, "-12-31")))]
+  # Assign end dates
+  dt[horizon == "ref", export_end := as.Date("2020-12-31")]
+  dt[horizon != "ref", export_end := as.Date(paste0(as.numeric(horizon) + 15, "-12-31"), format = "%Y-%m-%d")]
   
   # Filter data based on export ranges
   dt_filtered <- dt[date >= export_start & date <= export_end]
@@ -135,6 +136,25 @@ export_discharge_data <- function(dt, output_dir) {
     fwrite(export_data, file_path)
     
   }, by = .(station, scenario, variant, horizon)]
+  
+  # Create a subfolder for the zip files
+  zip_dir <- file.path(output_dir, "all_stations")
+  if (!dir.exists(zip_dir)) dir.create(zip_dir, recursive = TRUE)
+  
+  # Zip each station folder and save to all_stations
+  stations <- unique(dt_filtered$station)
+  for (stn in stations) {
+    stn_dir <- file.path(output_dir, stn)
+    zip_file <- file.path(zip_dir, paste0(stn, ".zip"))
+    
+    # Remove existing zip file if it exists
+    if (file.exists(zip_file)) file.remove(zip_file)
+    
+    # Create zip without path structure
+    zip(zipfile = zip_file,
+        files = list.files(stn_dir, full.names = TRUE),
+        flags = "-j")
+  }
   
   message("Export completed successfully.")
 }

@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # Define the remote and local directories
-REMOTE_DIR="nydegger@hyperion.wsl.ch:/home/nydegger/Rheinblick/routing"
-LOCAL_DIR="/Volumes/MT_case_sensitive/ETH_MT_Hydrological_Projections_Rhine_River/Data/Rheinblick2027/raw_prevah_output/routing"
+REMOTE_DIR="nydegger@hyperion.wsl.ch:/home/nydegger/Rheinblick/routing/Thu200"
+LOCAL_DIR="/Volumes/MT_case_sensitive/ETH_MT_Hydrological_Projections_Rhine_River/Data/Rheinblick2027/raw_prevah_output/routing/Thu200"
 
 # SSH into the remote server and find all subfolders
-folders=$(ssh nydegger@hyperion.wsl.ch "find /home/nydegger/Rheinblick/routing -mindepth 1 -maxdepth 1 -type d")
+folders=$(ssh nydegger@hyperion.wsl.ch "find /home/nydegger/Rheinblick/routing/Thu200 -mindepth 1 -maxdepth 1 -type d")
 
 # Loop through each folder and copy its content
 for folder in $folders; do

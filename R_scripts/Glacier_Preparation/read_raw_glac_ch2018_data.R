@@ -172,6 +172,6 @@ for (i in seq_len(nrow(ch2018_chain_glchain_dt))) {
 }
 
 # export the processed data ---------------------------------
-export_processed_data(ch2018_chain_glchain_dt, output_dir, "ch2018_chains_vs_glac")
+export_processed_data(ch2018_chain_glchain_dt, output_dir, "ch2018_chain_glchain")
 export_processed_data(ch2018_meteo_dt, output_dir, "ch2018_meteo")
 export_processed_data(ch2018_glacier_dt, output_dir, "ch2018_glacier")

@@ -112,30 +112,6 @@ stack_mean_value <- function(r_stack) {
   global(r_stack, "mean", na.rm = TRUE)[1, 1]
 }
 
-compute_stack_stats <- function(r_stack) {
-  stopifnot(inherits(r_stack, "SpatRaster"))
-  
-  # Use global() to compute all stats per layer
-  stats_dt <- data.table::as.data.table(terra::global(
-    r_stack,
-    fun = c("mean", "max", "min", "sd"),
-    na.rm = TRUE
-  ))
-  
-  # Add layer names for clarity
-  stats_dt[, layer := names(r_stack)]
-  data.table::setcolorder(stats_dt, c("layer", "mean", "max", "min", "sd"))
-  
-  return(stats_dt)
-}
-
-bias_correct_sund_rel <- function(r_stack, logit_diff) {
-  r_stack_logit <- logit_transform(r_stack)
-  r_stack_logit_bc <- r_stack_logit + logit_diff
-  r_stack_bc <- inv_logit_transform(r_stack_logit_bc)
-  return(r_stack_bc)
-}
-
 export_to_netcdf <- function(r_stack, out_dir, scenario, ensemble, varname, varunit = "units") {
   
   save_dir <- file.path(out_dir, scenario, varname)
@@ -204,13 +180,35 @@ center_lat <- get_center_lat_from_raster(hind_rast)
 # ----------------------------
 message("Processing hindcast scenario")
 
-# hindcast_r_stack_rel <- read_nc_raster(
+# hindcast_r_stack_raw <- read_nc_raster(
 #   meteo_dir = input_dir_meteo,
 #   scenario = "hindcast",
-#   variable = "sund_rel_rhine"
+#   variable = "sund_rel"
 # )
 
-hindcast_stats <- compute_stack_stats(hindcast_r_stack_rel)
+# resample to knmi 12 km grid
+hindcast_r_stack_rel <- resample(hindcast_r_stack_rel, hind_rast_res, method = "bilinear")
+
+# crop to rhine basin extent
+hindcast_r_stack_rel <- crop_and_mask_by_polygon(
+  hindcast_r_stack_rel,
+  crop_shape_path = rhine_bsn_path
+)
+
+export_to_netcdf(
+  r_stack = hindcast_r_stack_rel,
+  out_dir = output_dir,
+  scenario = "hindcast",
+  ensemble = NULL,
+  varname = "sund_rel_rhine",
+  varunit = "%"
+)
+
+# transform to logit space
+hindcast_r_stack_logit <- logit_transform(hindcast_r_stack_rel)
+
+# get overall mean for BC
+hindcast_logit_mean <- stack_mean_value(hindcast_r_stack_logit)
 
 
 # ----------------------------
@@ -236,16 +234,25 @@ for (i in seq_along(ens_stack_list_raw)) {
   ens <- names(ens_stack_list_raw)[i]
   message("Processing ensemble: ", ens)
   r_stack <- ens_stack_list_raw[[i]]
-  
+
   # crop to rhine basin extent
   r_stack <- crop_and_mask_by_polygon(
     r_stack,
     crop_shape_path = rhine_bsn_path
   )
   
+  export_to_netcdf(
+    r_stack = r_stack,
+    out_dir = output_dir,
+    scenario = "reference",
+    ensemble = ens,
+    varname = "sund_rel_rhine",
+    varunit = "%"
+  )
+
   # transform to logit space
   r_stack_logit <- logit_transform(r_stack)
-  
+
   # get overall mean for BC
   mean_logit_list[[ens]] <- stack_mean_value(r_stack_logit)
 }

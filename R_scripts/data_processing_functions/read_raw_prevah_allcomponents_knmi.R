@@ -27,8 +27,10 @@ all_scenario_horizons <- c(
 )
 
 scenario_horizons <- c(
-  "reference"
+  "Hd_2100"
 )
+
+read_hindcast <- FALSE
 
 ensembles <- paste0("ens", 1:8)
 
@@ -215,8 +217,11 @@ add_time_period_column <- function(dt, date_col = "date", horizon_col = "horizon
   dt[, year := as.numeric(format(get(date_col), "%Y"))]
   
   # Convert horizon to numeric and use default if conversion fails
-  dt[, horizon_num := as.numeric(get(horizon_col))]
-  dt[is.na(horizon_num), horizon_num := default_horizon]
+  dt[, horizon_num := fifelse(
+    grepl("^[0-9]+$", get(horizon_col)),
+    as.numeric(get(horizon_col)),
+    default_horizon
+  )]
   
   # Classify period
   dt[, period := ifelse(
@@ -348,79 +353,66 @@ for (scen in scenario_horizons) {
   )
 } # scenario_horizons loop
 
-# hindcast data
-cat("Processing hindcast data\n")
-horizon <- "horizon"
-scenario <- "none" # for control run
-variant <- "none"
-member <- "none"
-
-# List all subfolders (gebiete) in the matched scenario-ensemble folder
-gebiete_folders <- list.dirs(input_dir_hind, recursive = FALSE)
-# Loop over the gebiete folders
-for (ezg_dir in gebiete_folders) {
-  ezg <- basename(ezg_dir)
+if (read_hindcast) {
+  # hindcast data
+  cat("Processing hindcast data\n")
+  horizon <- "horizon"
+  scenario <- "none" # for control run
+  variant <- "none"
+  member <- "none"
   
-  if (ezg %in% no_knmi_gebiete) next # skip ezg that are not part of the Rhine
-  
-  # First process .mit files
-  mit_file <- file.path(ezg_dir, paste0(ezg, mit_output_file_suffix))
-  
-  mit_data <- process_mit_data(mit_file, horizon, scenario, variant, member, ezg)
-  
-  # Append this to the list of all mit data
-  all_mit_data_list[[length(all_mit_data_list) + 1]] <- mit_data
-  
-  if (!(ezg %in% no_meteo_gebiete)) {
-    # Process meteo statistics data
-    all_meteo_data_dt <- process_meteo_stats_data(ezg_dir, meteo_variables_hind, meteo_stat_file_suffix_hind, horizon, scenario, variant, member, ezg)
+  # List all subfolders (gebiete) in the matched scenario-ensemble folder
+  gebiete_folders <- list.dirs(input_dir_hind, recursive = FALSE)
+  # Loop over the gebiete folders
+  for (ezg_dir in gebiete_folders) {
+    ezg <- basename(ezg_dir)
     
-    # Create a named vector for mapping
-    replacement_map <- setNames(meteo_variables_knmi, meteo_variables_hind)
+    if (ezg %in% no_knmi_gebiete) next # skip ezg that are not part of the Rhine
     
-    # Update column names in the data table
-    setnames(all_meteo_data_dt, 
-             old = names(all_meteo_data_dt), 
-             new = stringr::str_replace_all(names(all_meteo_data_dt), replacement_map)
-    )
+    # First process .mit files
+    mit_file <- file.path(ezg_dir, paste0(ezg, mit_output_file_suffix))
     
-    all_meteo_data_list[[length(all_meteo_data_list) + 1]] <- all_meteo_data_dt
+    mit_data <- process_mit_data(mit_file, horizon, scenario, variant, member, ezg)
     
-  } # no_meteo_gebiete check
-} # gebiete_folders loop
+    # Append this to the list of all mit data
+    all_mit_data_list[[length(all_mit_data_list) + 1]] <- mit_data
+    
+    if (!(ezg %in% no_meteo_gebiete)) {
+      # Process meteo statistics data
+      all_meteo_data_dt <- process_meteo_stats_data(ezg_dir, meteo_variables_hind, meteo_stat_file_suffix_hind, horizon, scenario, variant, member, ezg)
+      
+      # Create a named vector for mapping
+      replacement_map <- setNames(meteo_variables_knmi, meteo_variables_hind)
+      
+      # Update column names in the data table
+      setnames(all_meteo_data_dt, 
+               old = names(all_meteo_data_dt), 
+               new = stringr::str_replace_all(names(all_meteo_data_dt), replacement_map)
+      )
+      
+      all_meteo_data_list[[length(all_meteo_data_list) + 1]] <- all_meteo_data_dt
+      
+    } # no_meteo_gebiete check
+  } # gebiete_folders loop
+  
+  row_value_map <- c(  # old_value = new_value
+    "Bod200" = "Bod400"
+  )
+  mit_data <- change_row_entries(mit_data, "basin", row_value_map)
+  all_meteo_data_dt <- change_row_entries(all_meteo_data_dt, "basin", row_value_map)
+  
+  # add columns and export
+  export_to_rds_csv(
+    mit_data, 
+    output_dir, 
+    "mit_output", 
+    "hindcast"
+  )
+  export_to_rds_csv(
+    all_meteo_data_dt, 
+    output_dir, 
+    "meteo_stat", 
+    "hindcast"
+  )
+}
 
-row_value_map <- c(  # old_value = new_value
-  "Bod200" = "Bod400"
-)
-mit_data <- change_row_entries(mit_data, "basin", row_value_map)
-all_meteo_data_dt <- change_row_entries(all_meteo_data_dt, "basin", row_value_map)
-
-# add columns and export
-export_to_rds_csv(
-  mit_data, 
-  output_dir, 
-  "mit_output", 
-  "hindcast"
-)
-export_to_rds_csv(
-  all_meteo_data_dt, 
-  output_dir, 
-  "meteo_stat", 
-  "hindcast"
-)
-
-# # Combine all the data.tables into one long data.table
-# knmi_mit_output_dt <- rbindlist(all_mit_data_list)
-# knmi_meteo_stat_dt <- rbindlist(all_meteo_data_list)
-# 
-# if (!dir.exists(output_dir)) {
-#   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
-# }
-# 
-# # Export to CSV
-# write.csv2(knmi_mit_output_dt, file.path(output_dir, paste0(output_name_mit_output, ".csv")), row.names = FALSE, quote = FALSE)
-# write.csv2(knmi_meteo_stat_dt, file.path(output_dir, paste0(output_name_meteo_stat, ".csv")), row.names = FALSE, quote = FALSE)
-# 
-# # Export to .RDS format
-# saveRDS(knmi_mit_output_dt, file.path(output_dir, paste0(output_name_mit_output, ".rds")))
-# saveRDS(knmi_meteo_stat_dt, file.path(output_dir, paste0(output_name_meteo_stat, ".rds")))

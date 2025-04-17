@@ -1,5 +1,6 @@
 library(here)
 library(future.apply)
+library(progressr)
 library(data.table)
 library(stringr)
 library(ncdf4)
@@ -50,7 +51,7 @@ read_and_convert_prevah_bin_raster <- function(file, crop_ext_vec = NULL) {
 }
 
 get_center_lat_from_raster <- function(r) {
-  stopifnot(inherits(r, "SpatRaster"))
+  stopifnot(inherits(r, c("SpatRaster", "SpatVector")))
   
   # Get center of raster in native CRS using numeric index
   ex <- ext(r)
@@ -128,58 +129,77 @@ read_and_stack_raster <- function(file_dt, reader_fun) {
   return(r_stack)
 }
 
-read_ensemble_stacks <- function(file_dt, reader_fun) {
-  ens_list <- split(file_dt, by = "ensemble", drop = TRUE)
-  stack_list <- list()
-  
-  for (i in seq_along(ens_list)) {
-    ens <- names(ens_list)[i]
-    dt <- ens_list[[i]]
-    message("Reading ensemble: ", ens)
-    r_stack <- read_and_stack_raster(dt, reader_fun)
-    stack_list[[ens]] <- r_stack
-  }
-  
-  # # Combine: this will give time × space × ensemble ordering
-  # combined <- rast(stack_list)
-  # names(combined) <- unlist(lapply(names(stack_list), function(ens) {
-  #   paste0(ens, "_", format(time(stack_list[[ens]]), "%Y-%m-%d"))
-  # }))
-  
-  return(stack_list)
-}
-
-compute_relative_sund_raster <- function(r_stack_abs, lat) {
-  stopifnot(inherits(r_stack_abs, "SpatRaster"))
-  
-  # Extract time from raster (must be set beforehand)
-  dates <- time(r_stack_abs)
-  stopifnot(!any(is.na(dates)))  # Ensure time info is present
-  
-  # Convert to DOY and cap at 365
+compute_daylength <- function(dates, lat) {
+  # Convert dates to DOY
   doy_vec <- yday(dates)
   doy_vec[doy_vec == 366] <- 365
   
   # Calculate daylengths (in hours) for each date
   daylength_vec <- daylength(lat = lat, doy = doy_vec)
   
-  # Clamp values in absolute raster: no negative sunshine
-  r_stack_abs <- clamp(r_stack_abs, lower = 0)
+  return(daylength_vec)
+}
+
+process_sund_rel_chunk <- function(i, raster_path, lat, chunk_size, out_dir, scenario, varname, varunit) {
+  r_stack_abs <- rast(raster_path)  # Re-open inside the worker
+  n <- nlyr(r_stack_abs)
+  idx <- i:min(i + chunk_size - 1, n)
   
-  # Compute relative sunshine raster
-  r_stack_rel <- r_stack_abs
-  stopifnot(length(daylength_vec) == nlyr(r_stack_abs))
+  r_chunk <- r_stack_abs[[idx]]
+  dates_chunk <- time(r_chunk)
+  daylength_chunk <- compute_daylength(dates_chunk, lat)
   
-  r_stack_rel <- r_stack_abs /daylength_vec
+  # print start and end date
+  start_date <- format(dates_chunk[1], "%Y-%m-%d")
+  end_date <- format(dates_chunk[length(dates_chunk)], "%Y-%m-%d")
+  cat("[", format(Sys.time(), "%H:%M:%S"), "] Processing layer", start_date, "to", end_date, "\n")
   
-  # Clamp values in relative raster: max relative duration is 1
-  r_stack_rel <- clamp(r_stack_rel, upper = 1)
+  r_chunk <- clamp(r_chunk, lower = 0)
+  cat("[", format(Sys.time(), "%H:%M:%S"), "] Clamped layer   ", paste0(idx[1], ":", idx[length(idx)]), " of ", n, "\n")
   
-  # Preserve time and layer names
-  time(r_stack_rel) <- dates
-  names(r_stack_rel) <- format(dates, "%Y-%m-%d")
+  r_out <- app(r_chunk, function(x) pmin(x / daylength_chunk, 1))
   
-  return(r_stack_rel)
+  time(r_out) <- dates_chunk
+  names(r_out) <- format(dates_chunk, "%Y-%m-%d")
+  
+  cat("[", format(Sys.time(), "%H:%M:%S"), "] Processed layer ", paste0(idx[1], ":", idx[length(idx)]), " of ", n, "\n")
+  # Determine padding width based on total number of layers (n)
+  pad_width <- nchar(as.character(n))
+  
+  # Format each index with zero-padding
+  start_str <- sprintf(paste0("%0", pad_width, "d"), idx[1])
+  end_str   <- sprintf(paste0("%0", pad_width, "d"), idx[length(idx)])
+  
+  export_to_netcdf(
+    r_stack = r_out,
+    out_dir = out_dir,
+    scenario = scenario,
+    ensemble = "none",
+    varname = varname,
+    varunit = varunit,
+    suffix = paste0("_chunk_", start_str, "_", end_str)
+  )
+}
+
+compute_relative_sund_parallel <- function(raster_path, lat, chunk_size = 100, out_dir, scenario, varname, varunit = "units") {
+  cat("[", format(Sys.time(), "%H:%M:%S"), "] Computing relative sunshine...\n")
+  r_stack_abs <- rast(raster_path)
+  stopifnot(inherits(r_stack_abs, "SpatRaster"))
+  n <- nlyr(r_stack_abs)
+  cat("[", format(Sys.time(), "%H:%M:%S"), "] Number of layers: ", n, "\n")
+  starts <- seq(1, n, by = chunk_size)
+  
+  future_lapply(
+    starts,
+    process_sund_rel_chunk,
+    raster_path = raster_path,
+    lat = lat,
+    chunk_size = chunk_size,
+    out_dir = out_dir,
+    scenario = scenario,
+    varname = varname,
+    varunit = varunit
+  )
 }
 
 compute_absolute_sund_raster <- function(r_stack, lat) {
@@ -189,19 +209,14 @@ compute_absolute_sund_raster <- function(r_stack, lat) {
   dates <- time(r_stack)
   stopifnot(!any(is.na(dates)))  # Ensure time info is present
   
-  # Convert to DOY and cap at 365
-  doy_vec <- yday(dates)
-  doy_vec[doy_vec == 366] <- 365
-  
   # Calculate daylengths (in hours) for each date
-  daylength_vec <- daylength(lat = lat, doy = doy_vec)
+  daylength_vec <- compute_daylength(dates, lat)
   
   # Clamp values in absolute raster: no negative sunshine
   r_stack <- clamp(r_stack, lower = 0, upper = 1)
   
-  # Compute relative sunshine raster
-  r_stack_abs <- r_stack
-  stopifnot(length(daylength_vec) == nlyr(r_stack_abs))
+  # Compute absolute sunshine raster
+  stopifnot(length(daylength_vec) == nlyr(r_stack))
   
   r_stack_abs <- r_stack * daylength_vec
   
@@ -212,70 +227,50 @@ compute_absolute_sund_raster <- function(r_stack, lat) {
   return(r_stack_abs)
 }
 
-crop_by_raster <- function(r_stack, crop_shape_path) {
-  crop_shape <- read_and_convert_prevah_bin_raster(crop_shape_path)
-  
-  return(cropped)
-}
-
-# Crop and mask
-crop_and_mask_by_polygon <- function(r_stack, crop_shape_path) {
-  crop_shape <- vect(crop_shape_path)
-  crop_shape <- project(crop_shape, crs(r_stack))
-  
-  masked <- mask(crop(r_stack, crop_shape), crop_shape)
-  return(masked)
-}
-
-logit_transform <- function(r_stack, eps = 1e-6) {
-  # Ensure values are in (0,1) interval
-  r_stack_clipped <- clamp(r_stack, lower = eps, upper = 1 - eps)
-  
-  # Apply logit transformation
-  logit_r <- log(r_stack_clipped / (1 - r_stack_clipped))
-  
-  return(logit_r)
-}
-
-inv_logit_transform <- function(logit_r_stack) {
-  backtransformed <- 1 / (1 + exp(-logit_r_stack))
-  return(backtransformed)
-}
-
-# Mean value over all layers and cells
-stack_mean_value <- function(r_stack) {
-  global(r_stack, "mean", na.rm = TRUE)[1, 1]
-}
-
-export_to_netcdf <- function(r_stack, out_dir, scenario, ensemble, varname, varunit = "units") {
+export_to_netcdf <- function(r_stack, out_dir, scenario, ensemble, varname, varunit = "units", suffix = "") {
   
   save_dir <- file.path(out_dir, scenario, varname)
   # Ensure the directory exists
   if (!dir.exists(save_dir)) {
     dir.create(save_dir, recursive = TRUE, showWarnings = FALSE)
   }
+  file_ending <- paste0(suffix, ".nc")
   file_name <- if (scenario == "hindcast") {
-    paste0(scenario, "_", varname, ".nc")
+    paste0(scenario, "_", varname, file_ending)
   } else {
-    paste0(scenario, "_", ensemble, "_", varname, ".nc")
+    paste0(scenario, "_", ensemble, "_", varname, file_ending)
   }
-  writeCDF(
-    x = r_stack,
-    filename = file.path(save_dir, file_name),
-    varname = varname,
-    unit = varunit,
-    overwrite = TRUE,
-    zname = "time",
-    compression = 4
-  )
+  with_progress({
+    writeCDF(
+      x = r_stack,
+      filename = file.path(save_dir, file_name),
+      varname = varname,
+      unit = varunit,
+      overwrite = TRUE,
+      zname = "time",
+      compression = 4
+    )
+  })
+  
   message("Exported NetCDF: ", file_name)
+}
+
+clean_up_memory <- function(...) {
+  vars <- as.character(substitute(list(...)))[-1]
+  rm(list = vars, envir = .GlobalEnv)
+  invisible(gc(verbose = FALSE))
 }
 
 read_and_process_ensemble <- function(files_dt) {
   ens <- unique(files_dt$ensemble)
   message("Reading ensemble: ", ens)
+  cat("[", format(Sys.time(), "%H:%M:%S"), "] Reading ensemble:", ens, "\n")
   
-  r_stack <- read_and_stack_raster(files_dt, read_and_convert_prevah_bin_raster)
+  with_progress({
+    r_stack <- read_and_stack_raster(files_dt, read_and_convert_prevah_bin_raster)
+  })
+  
+  cat("[", format(Sys.time(), "%H:%M:%S"), "] Writing ensemble:", ens, "\n")
   
   export_to_netcdf(
     r_stack = r_stack,
@@ -285,24 +280,102 @@ read_and_process_ensemble <- function(files_dt) {
     varname = "sund_rel",
     varunit = "%"
   )
-  
-  r_stack_abs <- compute_absolute_sund_raster(
-    r_stack = r_stack,
-    lat = center_lat
-  )
-  
-  export_to_netcdf(
-    r_stack = r_stack_abs,
-    out_dir = output_dir,
-    scenario = "reference",
-    ensemble = ens,
-    varname = "sund_abs",
-    varunit = "hours/d"
-  )
-  
-  return(setNames(list(r_stack), ens))
 }
 
+split_netcdf_to_chunks <- function(
+    input_file,
+    out_dir,
+    chunk_size = 343,
+    scenario = "reference",
+    ensemble = "none",
+    varname = "sund_rel",
+    varunit = "%"
+) {
+  # Ensure output directory exists
+  if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+  
+  # Load full raster (lazily)
+  r_full <- rast(input_file)
+  n <- nlyr(r_full)
+  pad_width <- nchar(as.character(n))
+  
+  # Set up parallel backend
+  plan(multisession, workers = 8)
+  
+  starts <- seq(1, n, by = chunk_size)
+  
+  process_chunk <- function(i) {
+    r_full <- rast(input_file)  # reopen safely inside worker
+    
+    idx <- i:min(i + chunk_size - 1, nlyr(r_full))
+    r_chunk <- r_full[[idx]]
+    
+    dates <- time(r_chunk)
+    names(r_chunk) <- format(dates, "%Y-%m-%d")
+    time(r_chunk) <- dates
+    
+    start_str <- sprintf(paste0("%0", pad_width, "d"), idx[1])
+    end_str   <- sprintf(paste0("%0", pad_width, "d"), idx[length(idx)])
+    
+    export_to_netcdf(
+      r_stack = r_chunk,
+      out_dir = out_dir,
+      scenario = scenario,
+      ensemble = ensemble,
+      varname = varname,
+      varunit = varunit,
+      suffix = paste0("_chunk_", start_str, "_", end_str)
+    )
+    
+  }
+  
+  # Run all chunks in parallel
+  future_lapply(starts, process_chunk)
+  cat("[", format(Sys.time(), "%H:%M:%S"), "] Completed:", scenario, ensemble, "\n")
+}
+
+combine_netcdf_chunks <- function(input_dir, pattern = "hindcast_sund_rel_chunk_.*\\.nc$", 
+                                  output_file = "hindcast_sund_rel.nc", 
+                                  overwrite = TRUE) {
+  # List chunk files in order
+  files <- list.files(input_dir, pattern = pattern, full.names = TRUE)
+  if (length(files) == 0) stop("No chunk files found.")
+  
+  # Sort files by chunk index (optional but helpful if file names are zero-padded)
+  files <- sort(files)
+  
+  cat("[", format(Sys.time(), "%H:%M:%S"), "] Found", length(files), "chunk files.\n")
+  
+  # Read each chunk as a SpatRaster
+  rasters <- lapply(files, rast)
+  
+  # Combine all chunks
+  cat("[", format(Sys.time(), "%H:%M:%S"), "] Combining chunks into one big raster...\n")
+  full_raster <- do.call(c, rasters)
+  
+  # Fix time metadata
+  dates_all <- do.call(c, lapply(rasters, time))  # keeps date class
+  time(full_raster) <- dates_all
+  
+  # Optional: set layer names from dates
+  names(full_raster) <- format(dates_all, "%Y-%m-%d")
+  
+  # Write to NetCDF
+  cat("[", format(Sys.time(), "%H:%M:%S"), "] Writing combined NetCDF to", output_file, "\n")
+  
+  export_to_netcdf(
+    r_stack = full_raster,
+    out_dir = input_dir,
+    scenario = "hindcast",
+    ensemble = "none",
+    varname = "sund_rel",
+    varunit = "%",
+    suffix = ""
+  )
+  
+  cat("[", format(Sys.time(), "%H:%M:%S"), "] Done! Combined file saved to", output_file, "\n")
+
+}
 
 
 # code to read data -------------------------------------------------------
@@ -320,14 +393,20 @@ hind_rast <- read_and_convert_prevah_bin_raster(hind_rast_path)
 knmi_rast <- read_and_convert_prevah_bin_raster(knmi_rast_path)
 rhine_bsn_shp <- vect(rhine_bsn_path)
 
-rhine_basin_shp <- project(rhine_basin_shp, crs(hind_rast))
+rhine_bsn_shp <- project(rhine_bsn_shp, crs(hind_rast))
 knmi_rast_crop <- crop(knmi_rast, hind_rast)
 hind_rast_res <- resample(hind_rast, knmi_rast_crop, method = "bilinear")
 
-hind_ext_vec <- as.vector(ext(ssd__rast))
+hind_ext_vec <- as.vector(ext(hind_rast))
 knmi_ext_vec <- as.vector(ext(knmi_rast))
 
-center_lat <- get_center_lat_from_raster(hind_rast)
+center_lat <- get_center_lat_from_raster(rhine_bsn_shp)
+
+terraOptions(
+  progress = 1,                  # show progress
+  memfrac = 0.8,                 # use up to 80% of available memory
+  tempdir = tempdir(),          # ensure it uses a fast local temp
+)
 
 # ----------------------------
 # Step 2: Process hindcast
@@ -340,12 +419,27 @@ hindcast_files_dt <- get_file_list(
   scenario = "hindcast"
 )
 
-hindcast_files_subset <- head(hindcast_files_dt, 5)
+#hindcast_files_subset <- head(hindcast_files_dt, 5)
+with_progress({
+  hindcast_r_stack_raw <- read_and_stack_raster(
+    file_dt = hindcast_files_dt,
+    reader_fun = read_and_convert_prevah_bin_raster
+  )
+})
 
-hindcast_r_stack_raw <- read_and_stack_raster(
-  file_dt = hindcast_files_subset,
-  reader_fun = read_and_convert_prevah_bin_raster
-)
+with_progress({
+  export_to_netcdf(
+    r_stack = hindcast_r_stack_raw,
+    out_dir = output_dir,
+    scenario = "hindcast",
+    ensemble = "none",
+    varname = "sund_abs",
+    varunit = "hours/d"
+  )
+})
+hindcast_r_stack_raw <- rast(file.path(output_dir, "hindcast", "sund_abs", "hindcast_sund_abs.nc"))
+hindcast_r_stack_raw <- hindcast_r_stack_raw[[1:365]]
+hindcast_r_stack_raw_sub <- hindcast_r_stack_raw[[1:10]]
 
 export_to_netcdf(
   r_stack = hindcast_r_stack_raw,
@@ -353,22 +447,50 @@ export_to_netcdf(
   scenario = "hindcast",
   ensemble = "none",
   varname = "sund_abs",
-  varunit = "hours/d"
+  varunit = "hours/d",
+  suffix = "_365"
+)
+
+# ----------------
+# here
+# ----------------
+
+plan(multisession, workers = 8)
+compute_relative_sund_parallel(
+  raster_path = file.path(output_dir, "hindcast", "sund_abs", "hindcast_sund_abs.nc"),
+  lat = center_lat,
+  chunk_size = 343,
+  out_dir = output_dir, scenario = "hindcast", varname = "sund_rel", varunit = "%"
+)
+plan(sequential)
+
+combine_netcdf_chunks(
+  input_dir = file.path(output_dir, "hindcast", "sund_rel"),
+  pattern = "hindcast_sund_rel_chunk_.*\\.nc$",
+  output_file = "hindcast_sund_rel.nc",
+  overwrite = TRUE
 )
 
 hindcast_r_stack_rel <- compute_relative_sund_raster(
   r_stack = hindcast_r_stack_raw,
-  lat = center_lat
+  lat = center_lat,
+  chunk_size = 100,
+  out_dir = output_dir, scenario = "hindcast", varname = "sund_rel", varunit = "%"
 )
 
-export_to_netcdf(
-  r_stack = hindcast_r_stack_rel,
-  out_dir = output_dir,
-  scenario = "hindcast",
-  ensemble = "none",
-  varname = "sund_rel",
-  varunit = "%"
-)
+
+
+with_progress({
+  export_to_netcdf(
+    r_stack = hindcast_r_stack_rel,
+    out_dir = output_dir,
+    scenario = "hindcast",
+    ensemble = "none",
+    varname = "sund_rel",
+    varunit = "%"
+  )
+})
+
 
 # ----------------------------
 # Step 3: Process KNMI reference (ens1 to ens8)
@@ -380,17 +502,32 @@ reference_files_dt <- get_file_list(
   scenario = "reference"
 )
 
-reference_files_subset <- reference_files_dt[, .SD[1:5], by = ensemble]
+#reference_files_subset <- reference_files_dt[, .SD[1:5], by = ensemble]
 
-ens_files_list <- split(reference_files_subset, by = "ensemble", drop = TRUE)
+ens_files_list <- split(reference_files_dt, by = "ensemble", drop = TRUE)
 
 # Run in parallel
 plan(multisession, workers = 8)
-ensemble_result_list <- future_lapply(ens_files_list, read_and_process_ensemble, future.seed = TRUE)
+future_lapply(ens_files_list, read_and_process_ensemble, future.seed = TRUE)
 
-# Combine named list back into one
-ens_stack_list_raw <- do.call(c, ensemble_result_list)
+plan(sequential)
 
+for (ens in c("ens3", "ens4", "ens5", "ens6", "ens7", "ens8")) {
+  message("[", format(Sys.time(), "%H:%M:%S"), "] Processing ensemble: ", ens)
+  
+  scenario <- "reference"
+  variable <- "sund_rel"
+  
+  split_netcdf_to_chunks(
+    input_file = file.path(output_dir, scenario, variable, paste0("reference_", ens, "_", variable, ".nc")),
+    out_dir = output_dir,
+    chunk_size = 343,
+    scenario = scenario,
+    ensemble = ens,
+    varname = variable,
+    varunit = "%"
+  )
+}
 # ens_stack_list_raw <- list()
 # 
 # for (i in seq_along(ens_files_list)) {

@@ -12,7 +12,7 @@ library(geosphere)
 home_dir <- file.path(here::here())
 
 # input directories
-input_dir_meteo <- file.path(home_dir, "Data", "Rheinblick2027", "processed_meteo")
+input_dir <- file.path(home_dir, "Data", "Rheinblick2027", "processed_meteo")
 
 # output directory
 output_dir <- file.path(home_dir, "Data", "Rheinblick2027", "processed_meteo")
@@ -20,8 +20,7 @@ output_dir <- file.path(home_dir, "Data", "Rheinblick2027", "processed_meteo")
 input_file_suffix <- ".nc"
 
 scenario_horizons <- c(
-  "reference", 
-  "Hd_2100"
+  "reference"
 )
 
 meteo_variables_knmi <- c(
@@ -49,11 +48,15 @@ read_and_convert_prevah_bin_raster <- function(file, crop_ext_vec = NULL) {
   return(r)
 }
 
-read_nc_raster <- function(meteo_dir, scenario, ensemble = NULL, variable) {
+read_nc_raster <- function(input_dir, scenario, ensemble = NULL, variable) {
+  
+  var_path <- file.path(input_dir, scenario, variable)
+  
   if (!is.null(ensemble)) {
     scenario <- paste0(scenario, "_", ensemble)
   }
-  file_path <- file.path(meteo_dir, scenario, variable, paste0(scenario, "_", variable, input_file_suffix))
+  
+  file_path <- file.path(var_path, paste0(scenario, "_", variable, input_file_suffix))
   r <- rast(file_path)
   return(r)
 }
@@ -79,17 +82,33 @@ get_center_lat_from_raster <- function(r) {
 
 crop_by_raster <- function(r_stack, crop_shape_path) {
   crop_shape <- read_and_convert_prevah_bin_raster(crop_shape_path)
-  
+  cropped <- crop(r_stack, crop_shape)
   return(cropped)
 }
 
-# Crop and mask
 crop_and_mask_by_polygon <- function(r_stack, crop_shape_path) {
   crop_shape <- vect(crop_shape_path)
   crop_shape <- project(crop_shape, crs(r_stack))
   
   masked <- mask(crop(r_stack, crop_shape), crop_shape)
   return(masked)
+}
+
+resample_to_knmi_grid_hind_ext <- function(r_stack, hind_rast_path, knmi_rast_path) {
+  # 1. Read hindcast and KNMI rasters
+  hind_rast <- read_and_convert_prevah_bin_raster(hind_rast_path)
+  knmi_rast <- read_and_convert_prevah_bin_raster(knmi_rast_path)
+  
+  # 2. Crop KNMI raster to hindcast extent
+  knmi_rast_crop <- crop(knmi_rast, hind_rast)
+  
+  # 3. Create resampling target (same extent, res, crs)
+  hind_rast_res <- resample(hind_rast, knmi_rast_crop, method = "bilinear")
+  
+  # 4. Resample the input raster stack to match the target
+  r_stack_resampled <- resample(r_stack, hind_rast_res, method = "bilinear")
+  
+  return(r_stack_resampled)
 }
 
 logit_transform <- function(r_stack, eps = 1e-6) {
@@ -110,6 +129,64 @@ inv_logit_transform <- function(logit_r_stack) {
 # Mean value over all layers and cells
 stack_mean_value <- function(r_stack) {
   global(r_stack, "mean", na.rm = TRUE)[1, 1]
+}
+
+compute_sund_stats_parallel <- function(
+    chunk_dir,
+    crop_shape_path,
+    pattern = ".*sund_rel_chunk_.*\\.nc$"
+) {
+  files <- list.files(chunk_dir, pattern = pattern, full.names = TRUE)
+  if (length(files) == 0) stop("No chunk files found.")
+  
+  plan(multisession, workers = 8)
+  
+  process_chunk <- function(file) {
+    r_stack <- rast(file)
+    
+    r_resample <- resample_to_knmi_grid_hind_ext(r_stack, hind_rast_path, knmi_rast_path)
+    
+    # 1. Crop + mask
+    r_stack_crop <- crop_and_mask_by_polygon(r_stack, crop_shape_path)
+    r_resample_crop <- crop_and_mask_by_polygon(r_resample, crop_shape_path)
+    
+    # 2. Logit transform
+    r_stack_logit <- logit_transform(r_stack_crop)
+    r_resample_logit <- logit_transform(r_resample_crop)
+    
+    # 3. Compute per-layer means
+    dates <- time(r_stack)
+    sund_means_raw <- global(r_stack_crop, "mean", na.rm = TRUE)[, 1]
+    logit_means_raw <- global(r_stack_logit, "mean", na.rm = TRUE)[, 1]
+    sund_means_res <- global(r_resample_crop, "mean", na.rm = TRUE)[, 1]
+    logit_means_res <- global(r_resample_logit, "mean", na.rm = TRUE)[, 1]
+    
+    # Extract ensemble from filename
+    ens_match <- regmatches(file, regexpr("ens\\d+", file))
+    ensemble <- if (length(ens_match) == 0 || ens_match == "") "none" else ens_match
+    
+    # 4. Store results in DT
+    data.table(
+      date = as.Date(dates),
+      ensemble = ensemble,
+      sund_rel_raw = sund_means_raw,
+      sund_rel_res = sund_means_res,
+      sund_logit_raw = logit_means_raw,
+      sund_logit_res = logit_means_res
+    )
+  }
+  
+  # Process all chunks in parallel
+  dt_list <- future_lapply(files, process_chunk)
+  
+  # Combine results
+  sund_stats_dt <- rbindlist(dt_list)
+  setorder(sund_stats_dt, ensemble, date)
+  
+  fwrite(sund_stats_dt, file.path(chunk_dir, paste0(scenario, "_sund_rel_stats.csv")))
+  saveRDS(sund_stats_dt, file.path(chunk_dir, paste0(scenario, "_sund_rel_stats.rds")))
+  
+  return(sund_stats_dt)
 }
 
 export_to_netcdf <- function(r_stack, out_dir, scenario, ensemble, varname, varunit = "units") {
@@ -189,26 +266,14 @@ message("Processing hindcast scenario")
 # resample to knmi 12 km grid
 hindcast_r_stack_rel <- resample(hindcast_r_stack_rel, hind_rast_res, method = "bilinear")
 
-# crop to rhine basin extent
-hindcast_r_stack_rel <- crop_and_mask_by_polygon(
-  hindcast_r_stack_rel,
-  crop_shape_path = rhine_bsn_path
+# compute relative and logit mean
+message("[", format(Sys.time(), "%H:%M:%S"), "] computing hindcast stats")
+hindcast_sund_stats <- compute_sund_stats_parallel(
+  chunk_dir = file.path(input_dir, "hindcast", "sund_rel"),
+  crop_shape_path = rhine_bsn_path,
+  pattern = ".*sund_rel_chunk.*\\.nc$"
 )
-
-export_to_netcdf(
-  r_stack = hindcast_r_stack_rel,
-  out_dir = output_dir,
-  scenario = "hindcast",
-  ensemble = NULL,
-  varname = "sund_rel_rhine",
-  varunit = "%"
-)
-
-# transform to logit space
-hindcast_r_stack_logit <- logit_transform(hindcast_r_stack_rel)
-
-# get overall mean for BC
-hindcast_logit_mean <- stack_mean_value(hindcast_r_stack_logit)
+message("[", format(Sys.time(), "%H:%M:%S"), "] stats computed")
 
 
 # ----------------------------
@@ -227,36 +292,5 @@ message("Processing reference scenario")
 #     variable = "sund_rel"
 #   )
 # }
-
-
-mean_logit_list <- list()
-for (i in seq_along(ens_stack_list_raw)) {
-  ens <- names(ens_stack_list_raw)[i]
-  message("Processing ensemble: ", ens)
-  r_stack <- ens_stack_list_raw[[i]]
-
-  # crop to rhine basin extent
-  r_stack <- crop_and_mask_by_polygon(
-    r_stack,
-    crop_shape_path = rhine_bsn_path
-  )
-  
-  export_to_netcdf(
-    r_stack = r_stack,
-    out_dir = output_dir,
-    scenario = "reference",
-    ensemble = ens,
-    varname = "sund_rel_rhine",
-    varunit = "%"
-  )
-
-  # transform to logit space
-  r_stack_logit <- logit_transform(r_stack)
-
-  # get overall mean for BC
-  mean_logit_list[[ens]] <- stack_mean_value(r_stack_logit)
-}
-
-referenece_logit_mean <- mean(unlist(mean_logit_list), na.rm = TRUE)
 
 logit_diff <- referenece_logit_mean - hindcast_logit_mean

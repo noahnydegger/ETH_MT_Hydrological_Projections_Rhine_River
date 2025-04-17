@@ -107,6 +107,69 @@ inv_logit_transform <- function(logit_r_stack) {
   return(backtransformed)
 }
 
+bias_correct_sund_rel <- function(r_stack, logit_diff = 1.077914) {
+  r_stack_logit <- logit_transform(r_stack)
+  r_stack_logit_bc <- r_stack_logit - logit_diff
+  r_stack_bc <- inv_logit_transform(r_stack_logit_bc)
+  return(r_stack_bc)
+}
+
+apply_sund_bc_parallel <- function(
+    chunk_dir,
+    crop_shape_path,
+    pattern = ".*sund_rel_chunk_.*\\.nc$"
+) {
+  files <- list.files(chunk_dir, pattern = pattern, full.names = TRUE)
+  if (length(files) == 0) stop("No chunk files found.")
+  
+  plan(multisession, workers = 8)
+  
+  process_chunk <- function(file) {
+    r_stack <- rast(file)
+    
+    # 1. Crop + mask
+    r_stack_crop <- crop_and_mask_by_polygon(r_stack, crop_shape_path)
+    #r_resample_crop <- crop_and_mask_by_polygon(r_resample, crop_shape_path)
+    
+    r_stack_logit <- logit_transform(r_stack_crop)
+    
+    r_stack_logit_bc_raw <- r_stack_logit - logit_diff_raw
+    r_stack_logit_bc_res <- r_stack_logit - logit_diff_res
+    
+    r_stack_bc_raw <- inv_logit_transform(r_stack_logit_bc_raw)
+    r_stack_bc_res <- inv_logit_transform(r_stack_logit_bc_res)
+    
+    # 3. Compute per-layer means
+    dates <- time(r_stack)
+    sund_means_bc_raw <- global(r_stack_bc_raw, "mean", na.rm = TRUE)[, 1]
+    sund_means_bc_res <- global(r_stack_bc_res, "mean", na.rm = TRUE)[, 1]
+    
+    # Extract ensemble from filename
+    ens_match <- regmatches(file, regexpr("ens\\d+", file))
+    ensemble <- if (length(ens_match) == 0 || ens_match == "") "none" else ens_match
+    
+    # 4. Store results in DT
+    data.table(
+      date = as.Date(dates),
+      ensemble = ensemble,
+      sund_rel_bc_raw = sund_means_bc_raw,
+      sund_rel_bc_res = sund_means_bc_res
+    )
+  }
+  
+  # Process all chunks in parallel
+  dt_list <- future_lapply(files, process_chunk)
+  
+  # Combine results
+  sund_stats_dt <- rbindlist(dt_list)
+  setorder(sund_stats_dt, ensemble, date)
+  
+  fwrite(sund_stats_dt, file.path(chunk_dir, paste0(scenario, "_sund_rel_bc_stats.csv")))
+  saveRDS(sund_stats_dt, file.path(chunk_dir, paste0(scenario, "_sund_rel_bc_stats.rds")))
+  
+  return(sund_stats_dt)
+}
+
 # Mean value over all layers and cells
 stack_mean_value <- function(r_stack) {
   global(r_stack, "mean", na.rm = TRUE)[1, 1]
@@ -127,13 +190,6 @@ compute_stack_stats <- function(r_stack) {
   data.table::setcolorder(stats_dt, c("layer", "mean", "max", "min", "sd"))
   
   return(stats_dt)
-}
-
-bias_correct_sund_rel <- function(r_stack, logit_diff) {
-  r_stack_logit <- logit_transform(r_stack)
-  r_stack_logit_bc <- r_stack_logit + logit_diff
-  r_stack_bc <- inv_logit_transform(r_stack_logit_bc)
-  return(r_stack_bc)
 }
 
 export_to_netcdf <- function(r_stack, out_dir, scenario, ensemble, varname, varunit = "units") {
@@ -185,71 +241,46 @@ knmi_ext_vec <- as.vector(ext(knmi_rast))
 
 center_lat <- get_center_lat_from_raster(hind_rast)
 
-# # Create extent rectangles as SpatVector objects
-# e1 <- as.polygons(ext(knmi_rast));       crs(e1) <- crs(knmi_rast)
-# e2 <- as.polygons(ext(knmi_rast_crop));  crs(e2) <- crs(knmi_rast_crop)
-# e3 <- as.polygons(ext(hind_rast_res));       crs(e3) <- crs(hind_rast_res)
-# shp <- as.polygons(rhine_basin_shp); crs(shp) <- crs(rhine_basin_shp)
-# 
-# # Plot all in one figure
-# plot(e1, border = "black", lwd = 2, main = "Raster Extents")  # full extent
-# plot(e2, border = "blue",  lwd = 2, main = "Raster Extents")  
-# plot(e3, border = "red",   lwd = 2, add = TRUE)                # hindcast
-# plot(shp, border = "green", lwd = 2, add = TRUE)
-# legend("topright", legend = c("KNMI crop", "Hindcast"),
-#        col = c("blue", "red"), lwd = 2, bg = "white")
-
 # ----------------------------
 # Step 2: Process hindcast
 # ----------------------------
 message("Processing hindcast scenario")
-
-# hindcast_r_stack_rel <- read_nc_raster(
-#   meteo_dir = input_dir_meteo,
-#   scenario = "hindcast",
-#   variable = "sund_rel_rhine"
-# )
-
-hindcast_stats <- compute_stack_stats(hindcast_r_stack_rel)
-
 
 # ----------------------------
 # Step 3: Process KNMI reference (ens1 to ens8)
 # ----------------------------
 message("Processing reference scenario")
 
-# ens_stack_list_raw <- list()
-# 
-# for (i in 1:8) {
-#   ens <- paste0("ens", i)
-#   ens_stack_list_raw[[ens]] <- read_nc_raster(
-#     meteo_dir = input_dir_meteo,
-#     scenario = "reference",
-#     ensemble = ens,
-#     variable = "sund_rel"
-#   )
-# }
+# compute bc
+message("[", format(Sys.time(), "%H:%M:%S"), "] computing reference BC")
+reference_sund_bc_stats <- apply_sund_bc_parallel(
+  chunk_dir = file.path(input_dir, "reference", "sund_rel"),
+  crop_shape_path = rhine_bsn_path,
+  pattern = ".*sund_rel_chunk_.*\\.nc$"
+)
+message("[", format(Sys.time(), "%H:%M:%S"), "] BC computed")
+
+reference_sund_bc_stats[, `:=`(
+  basin = "hydro_CH",
+  scenario = "none",
+  variant = "none",
+  horizon = "ref"
+)]
 
 
-mean_logit_list <- list()
-for (i in seq_along(ens_stack_list_raw)) {
-  ens <- names(ens_stack_list_raw)[i]
-  message("Processing ensemble: ", ens)
-  r_stack <- ens_stack_list_raw[[i]]
-  
-  # crop to rhine basin extent
-  r_stack <- crop_and_mask_by_polygon(
-    r_stack,
-    crop_shape_path = rhine_bsn_path
-  )
-  
-  # transform to logit space
-  r_stack_logit <- logit_transform(r_stack)
-  
-  # get overall mean for BC
-  mean_logit_list[[ens]] <- stack_mean_value(r_stack_logit)
-}
+setnames(reference_sund_bc_stats, old = "ensemble", new = "member")
 
-referenece_logit_mean <- mean(unlist(mean_logit_list), na.rm = TRUE)
+reference_sund_bc_stats <- add_scenario_horizon_grouping_columns(reference_sund_bc_stats)
 
-logit_diff <- referenece_logit_mean - hindcast_logit_mean
+reference_sund_stats <- merge(reference_sund_stats, reference_sund_bc_stats[, .(date, member, sund_rel_bc_raw, sund_rel_bc_res)], by = c("date", "member"))
+
+hindcast_sund_stats[, `:=`(
+  sund_rel_bc_raw = sund_rel_raw,
+  sund_rel_bc_res = sund_rel_res
+)]
+
+sund_stats_dt <- rbind(hindcast_sund_stats, reference_sund_stats,
+                       use.names = TRUE, fill = FALSE)
+
+
+

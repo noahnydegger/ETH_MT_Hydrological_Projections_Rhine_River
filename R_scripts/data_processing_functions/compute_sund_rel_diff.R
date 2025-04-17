@@ -144,22 +144,22 @@ compute_sund_stats_parallel <- function(
   process_chunk <- function(file) {
     r_stack <- rast(file)
     
-    r_resample <- resample_to_knmi_grid_hind_ext(r_stack, hind_rast_path, knmi_rast_path)
+    #r_resample <- resample_to_knmi_grid_hind_ext(r_stack, hind_rast_path, knmi_rast_path)
     
     # 1. Crop + mask
     r_stack_crop <- crop_and_mask_by_polygon(r_stack, crop_shape_path)
-    r_resample_crop <- crop_and_mask_by_polygon(r_resample, crop_shape_path)
+    #r_resample_crop <- crop_and_mask_by_polygon(r_resample, crop_shape_path)
     
     # 2. Logit transform
     r_stack_logit <- logit_transform(r_stack_crop)
-    r_resample_logit <- logit_transform(r_resample_crop)
+    #r_resample_logit <- logit_transform(r_resample_crop)
     
     # 3. Compute per-layer means
     dates <- time(r_stack)
     sund_means_raw <- global(r_stack_crop, "mean", na.rm = TRUE)[, 1]
     logit_means_raw <- global(r_stack_logit, "mean", na.rm = TRUE)[, 1]
-    sund_means_res <- global(r_resample_crop, "mean", na.rm = TRUE)[, 1]
-    logit_means_res <- global(r_resample_logit, "mean", na.rm = TRUE)[, 1]
+    #sund_means_res <- global(r_resample_crop, "mean", na.rm = TRUE)[, 1]
+    #logit_means_res <- global(r_resample_logit, "mean", na.rm = TRUE)[, 1]
     
     # Extract ensemble from filename
     ens_match <- regmatches(file, regexpr("ens\\d+", file))
@@ -170,9 +170,9 @@ compute_sund_stats_parallel <- function(
       date = as.Date(dates),
       ensemble = ensemble,
       sund_rel_raw = sund_means_raw,
-      sund_rel_res = sund_means_res,
+      sund_rel_res = "none", #sund_means_res,
       sund_logit_raw = logit_means_raw,
-      sund_logit_res = logit_means_res
+      sund_logit_res = "none" #logit_means_res
     )
   }
   
@@ -211,6 +211,40 @@ export_to_netcdf <- function(r_stack, out_dir, scenario, ensemble, varname, varu
     compression = 4
   )
   message("Exported NetCDF: ", file_name)
+}
+
+# Function to add 'scenario_variant' and 'scenario_variant_horizon' columns with custom ordering
+add_scenario_horizon_grouping_columns <- function(dt) {
+  dt[, scen_var := paste(scenario, variant, sep = "_")]
+  dt[, scen_var_hor := paste(scen_var, horizon, sep = "_")]
+  
+  # Define custom order for scenario
+  scenario_order <- c("H", "M", "L", "none")
+  
+  # Define custom order for scen_var (including the variants: dry, wet, none)
+  scen_var_order <- c(
+    "H_dry", "H_wet", "M_dry", "M_wet", "L_dry", "L_wet",
+    "L_none", "none_none"
+  )
+  
+  # Define custom order for scen_var_hor (with horizon)
+  scen_var_hor_order <- c(
+    "H_dry_2150", "H_dry_2100", "H_dry_2050", 
+    "H_wet_2150", "H_wet_2100", "H_wet_2050", 
+    "M_dry_2150", "M_dry_2100", "M_dry_2050", 
+    "M_wet_2150", "M_wet_2100", "M_wet_2050", 
+    "L_dry_2100",
+    "L_wet_2100",
+    "L_none_2033",
+    "none_none_ref", "none_none_hindcast", "none_none_observed"
+  )
+  
+  # Convert scen_var and scen_var_hor to factors with defined levels
+  dt[, scenario := factor(scenario, levels = scenario_order)]
+  dt[, scen_var := factor(scen_var, levels = scen_var_order)]
+  dt[, scen_var_hor := factor(scen_var_hor, levels = scen_var_hor_order)]
+  
+  return(dt)
 }
 
 
@@ -275,22 +309,105 @@ hindcast_sund_stats <- compute_sund_stats_parallel(
 )
 message("[", format(Sys.time(), "%H:%M:%S"), "] stats computed")
 
+hindcast_sund_stats[, `:=`(
+  basin = "hydro_CH",
+  scenario = "none",
+  variant = "none",
+  horizon = "hindcast"
+)]
+
+setnames(hindcast_sund_stats, old = "ensemble", new = "member")
+
+hindcast_files_dt <- add_scenario_horizon_grouping_columns(hindcast_sund_stats)
 
 # ----------------------------
 # Step 3: Process KNMI reference (ens1 to ens8)
 # ----------------------------
 message("Processing reference scenario")
 
-# ens_stack_list_raw <- list()
-# 
-# for (i in 1:8) {
-#   ens <- paste0("ens", i)
-#   ens_stack_list_raw[[ens]] <- read_nc_raster(
-#     meteo_dir = input_dir_meteo,
-#     scenario = "reference",
-#     ensemble = ens,
-#     variable = "sund_rel"
-#   )
-# }
+# compute relative and logit mean
+message("[", format(Sys.time(), "%H:%M:%S"), "] computing reference stats")
+reference_sund_stats <- compute_sund_stats_parallel(
+  chunk_dir = file.path(input_dir, "reference", "sund_rel"),
+  crop_shape_path = rhine_bsn_path,
+  pattern = ".*sund_rel_chunk_.*\\.nc$"
+)
+message("[", format(Sys.time(), "%H:%M:%S"), "] stats computed")
 
-logit_diff <- referenece_logit_mean - hindcast_logit_mean
+reference_sund_stats[, `:=`(
+  basin = "hydro_CH",
+  scenario = "none",
+  variant = "none",
+  horizon = "ref"
+)]
+
+reference_sund_stats[, `:=`(
+  sund_rel_res = sund_rel_raw,
+  sund_logit_res = sund_logit_raw
+)]
+
+setnames(reference_sund_stats, old = "ensemble", new = "member")
+
+reference_sund_stats <- add_scenario_horizon_grouping_columns(reference_sund_stats)
+# ----------------------------
+# Step 4: Compute mean difference
+# ----------------------------
+sund_stats_dt <- rbind(hindcast_sund_stats, reference_sund_stats,
+                        use.names = TRUE, fill = FALSE)
+hindcast_logit_raw_mean <- hindcast_sund_stats[, mean(sund_logit_raw, na.rm = TRUE)]
+hindcast_logit_res_mean <- hindcast_sund_stats[, mean(sund_logit_res, na.rm = TRUE)]
+
+reference_logit_mean <- reference_sund_stats[, mean(sund_logit_raw, na.rm = TRUE)]
+
+logit_diff_raw <- reference_logit_mean - hindcast_logit_raw_mean
+logit_diff_res <- reference_logit_mean - hindcast_logit_res_mean
+
+# ----------------------------
+# Step 5: Create Plots
+# ----------------------------
+
+source(here("R_scripts", "plotting_functions", "plot_pdf_cdf.R"))
+basins <- unique(sund_stats_dt$basin)
+color_col <- "scen_var_hor"
+group_cols <- c("scenario", "variant", "horizon")
+value_cols <- c("sund_rel_bc_raw", "sund_rel_bc_res", "sund_rel_raw", "sund_rel_res", "sund_logit_raw", "sund_logit_res")
+info_col <- c("sund_rel_mean")
+for (bsn in basins) {
+  dt <- sund_stats_dt[basin == bsn]
+  for (value_col in value_cols) {
+    cat("Plotting cdf for", bsn, value_col, "\n")
+    
+    plot_cdf(dt, bsn, info_col, color_col, value_col, group_cols)
+  }
+} # basin loop
+
+
+source(here("R_scripts", "plotting_functions", "plot_seasonality.R"))
+group_cols <- c("basin", "scen_var_hor")
+value_cols <- c("sund_rel_bc_raw", "sund_rel_bc_res", "sund_rel_raw", "sund_rel_res", "sund_logit_raw", "sund_logit_res")
+color_col <- "scen_var_hor"
+
+gof_pairs <- c("none_none_hindcast", "none_none_ref")
+
+# Compute rolling statistics
+rolling_stats_dt <- compute_rolling_stats(sund_stats_dt, group_cols, value_cols)
+
+# Add "rm_" prefix to each value column
+group_cols <- c(group_cols, "DayOfYear")
+value_cols <- paste0("rm_", value_cols)
+
+# compute seasonality and produce plots
+for (stat in c("mean")) {
+  seasonality_dt <- compute_seasonality(rolling_stats_dt, group_cols = group_cols, value_cols = value_cols, stat = stat)
+  for (bsn in basins) {
+    dt <- seasonality_dt[basin == bsn]
+    for (value_col in value_cols) {
+      cat("Plotting seasonality for", bsn, value_col, "\n")
+      
+      info_col <- c("sund_rel_mean")
+      
+      plot_seasonality_ts(dt, bsn, info_col, color_col, value_col, stat, info_text = "_rast_bc", gof_pairs = gof_pairs)
+      
+    } # value_col loop
+  } # basin loop
+} # stat loop

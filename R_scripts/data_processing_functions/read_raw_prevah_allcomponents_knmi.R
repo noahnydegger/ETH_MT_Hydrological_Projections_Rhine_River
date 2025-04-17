@@ -27,10 +27,13 @@ all_scenario_horizons <- c(
 )
 
 scenario_horizons <- c(
-  "Hd_2100"
+  "L_2033",
+  "Md_2050", "Mn_2050", "Hd_2050", "Hn_2050",
+  "Ld_2100", "Ln_2100", "Md_2100", "Mn_2100", "Hd_2100", "Hn_2100",
+  "Md_2150", "Mn_2150", "Hd_2150", "Hn_2150"
 )
 
-read_hindcast <- FALSE
+read_hindcast <- TRUE
 
 ensembles <- paste0("ens", 1:8)
 
@@ -356,7 +359,7 @@ for (scen in scenario_horizons) {
 if (read_hindcast) {
   # hindcast data
   cat("Processing hindcast data\n")
-  horizon <- "horizon"
+  horizon <- "hindcast"
   scenario <- "none" # for control run
   variant <- "none"
   member <- "none"

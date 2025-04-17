@@ -144,7 +144,7 @@ plot_info <- list(
       
       # discharge all
       "obs_none_ref" = "black",
-      "contr_none_ref" = "grey40",
+      "none_none_hindcast" = "grey40",
       "none_none_ref" = "grey70",
       
       "L_none_2033" = "lightblue",
@@ -189,7 +189,7 @@ plot_info <- list(
       
       # discharge all
       "obs_none_ref" = "Observed",
-      "contr_none_ref" = "Hindcast",
+      "none_none_hindcast" = "Hindcast",
       "none_none_ref" = "KNMI ref",
       "L_none_2033" = "L 2033",
       "L_dry_2100" = "L dry 2100",

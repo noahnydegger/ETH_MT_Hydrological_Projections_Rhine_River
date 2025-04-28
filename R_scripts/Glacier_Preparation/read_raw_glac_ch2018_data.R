@@ -6,8 +6,8 @@ library(zoo)
 # project directory
 home_dir <- file.path(here::here())
 
-period_length <- 10
 gebiet <- "ThS"
+
 meteo_variables <- c("temp" = "tair", 
                      "prec" = "prec", 
                      "rad_" = "radg",
@@ -44,7 +44,7 @@ parse_chains_glchains <- function(file_path) {
   data.table::data.table(chain = chains, glchain = glchains[seq_along(chains)])
 }
 
-read_chain_meteo <- function(chain, meteo_dir, meteo_variables) {
+read_chain_meteo <- function(chain, glchain, meteo_dir, meteo_variables) {
   all_vars_dt <- list()
   
   for (old_var in names(meteo_variables)) {
@@ -74,9 +74,6 @@ read_chain_meteo <- function(chain, meteo_dir, meteo_variables) {
         new = paste0(new_prefix, "_", stat_renames)
       )
       
-      # Add basin column
-      meteo_dt[, basin := "ThS200"]
-      
       all_vars_dt[[new_prefix]] <- meteo_dt
     }
   }
@@ -85,7 +82,9 @@ read_chain_meteo <- function(chain, meteo_dir, meteo_variables) {
   final_dt <- Reduce(function(x, y) merge(x, y, by = "date", all = TRUE), all_vars_dt)
   
   # Add chain column
+  final_dt[, basin := "ThS200"]
   final_dt[, chain := chain]
+  final_dt[, glchain := glchain]
   
   return(final_dt)
 }
@@ -159,8 +158,8 @@ for (i in seq_len(nrow(ch2018_chain_glchain_dt))) {
   glchain <- ch2018_chain_glchain_dt$glchain[i]
   
   cat("Processing chain:", chain, "\n")
-  # Process meteo files using the new function
-  meteo_dt <- read_chain_meteo(chain, meteo_dir, meteo_variables)
+  # Process meteo files
+  meteo_dt <- read_chain_meteo(chain, glchain, meteo_dir, meteo_variables)
   ch2018_meteo_dt <- rbind(ch2018_meteo_dt, meteo_dt, fill = TRUE)
   
   # Process glacier data
@@ -175,3 +174,5 @@ for (i in seq_len(nrow(ch2018_chain_glchain_dt))) {
 export_processed_data(ch2018_chain_glchain_dt, output_dir, "ch2018_chain_glchain")
 export_processed_data(ch2018_meteo_dt, output_dir, "ch2018_meteo")
 export_processed_data(ch2018_glacier_dt, output_dir, "ch2018_glacier")
+
+

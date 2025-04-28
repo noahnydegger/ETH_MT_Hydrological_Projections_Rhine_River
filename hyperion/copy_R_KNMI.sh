@@ -5,7 +5,7 @@ REMOTE_DIR="nydegger@hyperion.wsl.ch:/home/nydegger/Rheinblick/R_KNMI"
 LOCAL_DIR="/Volumes/MT_case_sensitive/ETH_MT_Hydrological_Projections_Rhine_River/Data/Rheinblick2027/raw_prevah_output/R_KNMI"
 
 # SSH into the remote server and find all matching folders
-folders=$(ssh nydegger@hyperion.wsl.ch "find /home/nydegger/Rheinblick/R_KNMI -mindepth 2 -maxdepth 2 -type d -name 'ThS200*'")
+folders=$(ssh nydegger@hyperion.wsl.ch "find /home/nydegger/Rheinblick/R_KNMI -mindepth 1 -maxdepth 1 -type d -name 'Hd_2150*'")
 
 # Loop through each folder and copy its content
 for folder in $folders; do
@@ -15,7 +15,7 @@ for folder in $folders; do
     folder_name=$(basename "$folder")
     
     # Define the corresponding local folder
-    local_folder="$LOCAL_DIR/$parent_name/$folder_name"
+    local_folder="$LOCAL_DIR/$folder_name"
 
     # Delete the local folder if it exists
     if [ -d "$local_folder" ]; then
@@ -27,10 +27,10 @@ for folder in $folders; do
 
     # Copy content from remote to local
     rsync -avz \
+        --include='*/' \
         --include='*.mit' \
         --include='*.stats' \
         --include='*.pri' \
-        --exclude='*/' \
         --exclude='*' \
         "nydegger@hyperion.wsl.ch:$folder/" "$local_folder/"
 

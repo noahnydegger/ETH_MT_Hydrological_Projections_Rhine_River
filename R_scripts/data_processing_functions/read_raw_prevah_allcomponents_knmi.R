@@ -22,18 +22,15 @@ all_scenario_horizons <- c(
   "reference", 
   "L_2033",
   "Md_2050", "Mn_2050", "Hd_2050", "Hn_2050",
-  "Ld_2100", "Ln_2100", "Md_2100", "Mn_2100", "Hd_2100", "Hn_2100",
+  "Md_2100", "Mn_2100", "Hd_2100", "Hn_2100", "Ld_2100", "Ln_2100",
   "Md_2150", "Mn_2150", "Hd_2150", "Hn_2150"
 )
 
 scenario_horizons <- c(
-  "L_2033",
-  "Md_2050", "Mn_2050", "Hd_2050", "Hn_2050",
-  "Ld_2100", "Ln_2100", "Md_2100", "Mn_2100", "Hd_2100", "Hn_2100",
-  "Md_2150", "Mn_2150", "Hd_2150", "Hn_2150"
+  "L_2033", "Md_2100", "Ld_2100", "Ln_2100", "Hd_2150"
 )
 
-read_hindcast <- TRUE
+read_hindcast <- FALSE
 
 ensembles <- paste0("ens", 1:8)
 

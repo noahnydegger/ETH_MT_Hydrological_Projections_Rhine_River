@@ -25,13 +25,17 @@ scenario_horizons <- c(
 )
 
 meteo_variables_knmi <- c(
-  "sund" = "sund_rel"
-  #"radg" = "radg_abs"
+  "sund" = "sund_rel",
+  "radg" = "radg_abs",
+  "tair" = "tair",
+  "prec" = "prec"
 )
 
 meteo_variables_hind <- c(
-  "ssd_" = "sund_abs"
-  #"rad_" = "radg_abs"
+  "ssd_" = "sund_abs",
+  "rad_" = "radg_abs",
+  "temp" = "tair",
+  "prec" = "prec"
 )
 
 ensembles <- paste0("ens", 1:8)
@@ -227,9 +231,9 @@ compute_absolute_sund_raster <- function(r_stack, lat) {
   return(r_stack_abs)
 }
 
-export_to_netcdf <- function(r_stack, out_dir, scenario, ensemble, varname, varunit = "units", suffix = "") {
+export_to_netcdf <- function(r_stack, out_dir, scenario, ensemble, varname, varunit = "unit", suffix = "") {
   
-  save_dir <- file.path(out_dir, scenario, varname)
+  save_dir <- file.path(out_dir, scenario, paste0(varname, suffix))
   # Ensure the directory exists
   if (!dir.exists(save_dir)) {
     dir.create(save_dir, recursive = TRUE, showWarnings = FALSE)
@@ -261,9 +265,8 @@ clean_up_memory <- function(...) {
   invisible(gc(verbose = FALSE))
 }
 
-read_and_process_ensemble <- function(files_dt) {
+read_and_export_ensemble <- function(files_dt, output_dir, scenario, ens, varname, varunit, suffix = "") {
   ens <- unique(files_dt$ensemble)
-  message("Reading ensemble: ", ens)
   cat("[", format(Sys.time(), "%H:%M:%S"), "] Reading ensemble:", ens, "\n")
   
   with_progress({
@@ -275,10 +278,11 @@ read_and_process_ensemble <- function(files_dt) {
   export_to_netcdf(
     r_stack = r_stack,
     out_dir = output_dir,
-    scenario = "reference",
+    scenario = scenario,
     ensemble = ens,
-    varname = "sund_rel",
-    varunit = "%"
+    varname = varname,
+    varunit = varunit,
+    suffix = suffix
   )
 }
 
@@ -286,10 +290,10 @@ split_netcdf_to_chunks <- function(
     input_file,
     out_dir,
     chunk_size = 343,
-    scenario = "reference",
-    ensemble = "none",
-    varname = "sund_rel",
-    varunit = "%"
+    scenario,
+    ensemble,
+    varname,
+    varunit
 ) {
   # Ensure output directory exists
   if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
@@ -405,7 +409,7 @@ center_lat <- get_center_lat_from_raster(rhine_bsn_shp)
 terraOptions(
   progress = 1,                  # show progress
   memfrac = 0.8,                 # use up to 80% of available memory
-  tempdir = tempdir(),          # ensure it uses a fast local temp
+  tempdir = tempdir()          # ensure it uses a fast local temp
 )
 
 # ----------------------------
@@ -451,10 +455,6 @@ export_to_netcdf(
   suffix = "_365"
 )
 
-# ----------------
-# here
-# ----------------
-
 plan(multisession, workers = 8)
 compute_relative_sund_parallel(
   raster_path = file.path(output_dir, "hindcast", "sund_abs", "hindcast_sund_abs.nc"),
@@ -478,8 +478,6 @@ hindcast_r_stack_rel <- compute_relative_sund_raster(
   out_dir = output_dir, scenario = "hindcast", varname = "sund_rel", varunit = "%"
 )
 
-
-
 with_progress({
   export_to_netcdf(
     r_stack = hindcast_r_stack_rel,
@@ -493,22 +491,36 @@ with_progress({
 
 
 # ----------------------------
-# Step 3: Process KNMI reference (ens1 to ens8)
+# Step 3: Process KNMI scenario (ens1 to ens8)
 # ----------------------------
-cat("Processing reference data...\n")
-reference_files_dt <- get_file_list(
+scen <- "Hd_2100"
+cat("Processing", scen, "data...\n")
+knmi_scenario_files_dt <- get_file_list(
   meteo_dir = input_dir_meteo,
   prefix_list = meteo_variables_knmi,
-  scenario = "reference"
+  scenario = scen
 )
 
-#reference_files_subset <- reference_files_dt[, .SD[1:5], by = ensemble]
+var = "sund_rel"
+date_range <- c("2086-01-01", "2115-12-31")
 
-ens_files_list <- split(reference_files_dt, by = "ensemble", drop = TRUE)
+knmi_files_sub_dt <- knmi_scenario_files_dt[
+  variable == var & date >= date_range[1] & date <= date_range[2]
+]
+
+knmi_files_sub_dt<- knmi_files_sub_dt[, .SD[1:5], by = ensemble]
+
+ens_files_list <- split(knmi_files_sub_dt, by = "ensemble", drop = TRUE)
 
 # Run in parallel
 plan(multisession, workers = 8)
-future_lapply(ens_files_list, read_and_process_ensemble, future.seed = TRUE)
+future_lapply(ens_files_list, read_and_export_ensemble,
+              output_dir,
+              scenario,
+              "sund_rel",
+              "%",
+              "_raw", 
+              future.seed = TRUE)
 
 plan(sequential)
 
@@ -528,36 +540,4 @@ for (ens in c("ens3", "ens4", "ens5", "ens6", "ens7", "ens8")) {
     varunit = "%"
   )
 }
-# ens_stack_list_raw <- list()
-# 
-# for (i in seq_along(ens_files_list)) {
-#   ens <- names(ens_files_list)[i]
-#   files_dt <- ens_files_list[[i]]
-#   message("Reading ensemble: ", ens)
-#   r_stack <- read_and_stack_raster(files_dt, read_and_convert_prevah_bin_raster)
-#   ens_stack_list_raw[[ens]] <- r_stack
-#   
-#   export_to_netcdf(
-#     r_stack = r_stack,
-#     out_dir = output_dir,
-#     scenario = "reference",
-#     ensemble = ens,
-#     varname = "sund_rel",
-#     varunit = "%"
-#   )
-#   
-#   r_stack_abs <- compute_absolute_sund_raster(
-#     r_stack = r_stack,
-#     lat = center_lat
-#   )
-#   
-#   export_to_netcdf(
-#     r_stack = r_stack_abs,
-#     out_dir = output_dir,
-#     scenario = "reference",
-#     ensemble = ens,
-#     varname = "sund_abs",
-#     varunit = "hours/d"
-#   )
-# }
 

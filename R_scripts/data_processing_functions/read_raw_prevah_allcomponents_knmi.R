@@ -201,7 +201,7 @@ add_scenario_horizon_grouping_columns <- function(dt) {
     "L_dry_2100",
     "L_wet_2100",
     "L_none_2033",
-    "none_none_ref", "none_none_hindcast", "none_none_observed"
+    "none_none_ref", "none_none_hindcast", "none_none_observation"
   )
   
   # Convert scen_var and scen_var_hor to factors with defined levels
@@ -217,11 +217,8 @@ add_time_period_column <- function(dt, date_col = "date", horizon_col = "horizon
   dt[, year := as.numeric(format(get(date_col), "%Y"))]
   
   # Convert horizon to numeric and use default if conversion fails
-  dt[, horizon_num := fifelse(
-    grepl("^[0-9]+$", get(horizon_col)),
-    as.numeric(get(horizon_col)),
-    default_horizon
-  )]
+  vals <- dt[[horizon_col]]
+  dt[, horizon_num := ifelse(grepl("^[0-9]{4}$", vals), as.integer(vals), default_horizon)]
   
   # Classify period
   dt[, period := ifelse(

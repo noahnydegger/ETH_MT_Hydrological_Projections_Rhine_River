@@ -12,30 +12,58 @@ input_dir_obse <- file.path(home_dir, "Data", "Rheinblick2027", "discharge_measu
 # output directory
 output_dir <- file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output")
 
-input_file_prefix_knmi <- "Swissrhine200_"
-input_file_prefix_knmi <- "Thur200_"
+output_file_name <- "prevah_discharge_knmi"
+
 input_file_suffix_knmi <- ".dat"
 
-input_file_hind <- "Swissrhine200_CTRL_RUN_WSL_F_2021_g73.dat"
-input_file_obse <- "2289.daily.mean.dat" # Basel station 
+# file prefix = c(station names)
+knmi_routing_files <- list(
+  "Swissrhine200_" = c("Rekingen", "Untersiggenthal", "Rheinfelden", "Basel Rheinhalle", "Wiese"),
+  #"Birs200_" = c(),
+  "Thur200_" = c("hal", "mur", "rem", "Andelfingen")
+)
 
-output_file_name <- "prevah_discharge_Andelfinden_knmi"
+# file name = c(station names)
+hind_routing_files <- list(
+  "Swissrhine200_CTRL_RUN_WSL_F_2021_g73.dat" = c("Rekingen", "Untersiggenthal", "Rheinfelden", "Basel Rheinhalle", "Wiese")
+)
 
-column_names_prevah <- c("YYYY", "MM", "DD", "Rekingen", "Untersiggenthal", "Rheinfelden", "Basel Rheinhalle", "Wiese")
-column_names_prevah <- c("YYYY", "MM", "DD", "hal", "mur", "rem", "Andelfingen")
-column_names_obse <- c("YYYY", "MM", "DD", "Basel Rheinhalle")
+# file name = c(station names)
+observation_files <- list(
+  "2289.daily.mean.dat" = c("Basel Rheinhalle")
+)
 
 # Define which stations to keep (leave empty `c()` to keep all)
-selected_stations <- c("Andelfingen")
+selected_stations <- c()
+rblick_stations <- c("Gisingen", "Diepoldsau", "Kennelbach", "Rekingen", "Brugg", 
+                     "Mellingen", "Brienzwiler", "Bruegg-Aegerten", "Basel Rheinhalle", 
+                     "Riegel", "Schwaibach", "Bad Rotenfels", "Maxau", "Rockenau-SKA", 
+                     "Worms", "Raunheim", "Mainz", "Grolsheim", "Kaub", "Kalkofen", 
+                     "Cochem", "Andernach", "Menden", "Koeln", "Duesseldorf", 
+                     "Hattingen", "Schermbeck", "Lobith", "Andelfingen")
+
+all_gebiete <- c(
+  "BEN200", "BiS200", "EmW200", "Lim200", "NoW200", "Reu200", "RhN200", "SSG200", "TGl200", "ThS200", "Thu200", "WaS200"
+)
 
 gebiete <- c(
-  "Thu200" # NoW200
+  "NoW200","Thu200"
 )
 
-scenarios <- c(
-  "reference",
-  "Hd_2100", "Hn_2100"
+all_scenario_horizons <- c(
+  "reference", 
+  "L_2033",
+  "Md_2050", "Mn_2050", "Hd_2050", "Hn_2050",
+  "Md_2100", "Mn_2100", "Hd_2100", "Hn_2100", "Ld_2100", "Ln_2100",
+  "Md_2150", "Mn_2150", "Hd_2150", "Hn_2150"
 )
+
+scenario_horizons <- c(
+  "reference"
+)
+
+read_hindcast <- FALSE
+read_observation <- TRUE
 
 # functions ---------------------------------------------------------------
 read_raw_discharge_data <- function(file_path, column_names) {
@@ -78,45 +106,148 @@ process_discharge_data <- function(data_file, column_names, selected_stations, h
       source = source
     )]
     
+    discharge_long <- add_scenario_horizon_grouping_columns(discharge_long)
+    discharge_long <- add_time_period_column(discharge_long)
+    
+    prevah_date_cols <- c("YYYY", "MM", "DD")
+    prevah_general_cols <- c("station")
+    rblick_date_cols <- c("date")
+    rblick_cols <- c("horizon", "scenario", "variant", "member", "scen_var", "scen_var_hor", "period", "hydro_model", "source")
+    
+    non_value_col <- c(prevah_date_cols, prevah_general_cols, rblick_date_cols, rblick_cols)
+    
+    value_cols <- c("discharge", "unit")
+    
     # Select required columns in correct order
-    discharge_long <- discharge_long[, .(station, date, discharge, unit, horizon, scenario, 
-                                         variant, member, hydro_model, source)]
+    col_order <- c(prevah_general_cols, rblick_date_cols, value_cols, rblick_cols)
+    
+    # Select required columns in correct order
+    discharge_long <- discharge_long[, col_order, with = FALSE]
     
     return(discharge_long)
     
   } else {
-    stop(paste("File not found:", data_file))
+    warning(paste("File not found:", data_file))
   }
 }
 
-export_discharge_data <- function(dt, output_dir) {
+# Function to add 'scenario_variant' and 'scenario_variant_horizon' columns with custom ordering
+add_scenario_horizon_grouping_columns <- function(dt) {
+  dt[, scen_var := paste(scenario, variant, sep = "_")]
+  dt[, scen_var_hor := paste(scen_var, horizon, sep = "_")]
+  
+  # Define custom order for scenario
+  scenario_order <- c("H", "M", "L", "none")
+  
+  # Define custom order for scen_var (including the variants: dry, wet, none)
+  scen_var_order <- c(
+    "H_dry", "H_wet", "M_dry", "M_wet", "L_dry", "L_wet",
+    "L_none", "none_none"
+  )
+  
+  # Define custom order for scen_var_hor (with horizon)
+  scen_var_hor_order <- c(
+    "H_dry_2150", "H_dry_2100", "H_dry_2050", 
+    "H_wet_2150", "H_wet_2100", "H_wet_2050", 
+    "M_dry_2150", "M_dry_2100", "M_dry_2050", 
+    "M_wet_2150", "M_wet_2100", "M_wet_2050", 
+    "L_dry_2100",
+    "L_wet_2100",
+    "L_none_2033",
+    "none_none_ref", "none_none_hindcast", "none_none_observation"
+  )
+  
+  # Convert scen_var and scen_var_hor to factors with defined levels
+  dt[, scenario := factor(scenario, levels = scenario_order)]
+  dt[, scen_var := factor(scen_var, levels = scen_var_order)]
+  dt[, scen_var_hor := factor(scen_var_hor, levels = scen_var_hor_order)]
+  
+  return(dt)
+}
+
+add_time_period_column <- function(dt, date_col = "date", horizon_col = "horizon", default_horizon = 2005) {
+  # Get the numeric year from the date column
+  dt[, year := as.numeric(format(get(date_col), "%Y"))]
+  
+  # Convert horizon to numeric and use default if conversion fails
+  vals <- dt[[horizon_col]]
+  dt[, horizon_num := ifelse(grepl("^[0-9]{4}$", vals), as.integer(vals), default_horizon)]
+  
+  # Classify period
+  dt[, period := ifelse(
+    year >= horizon_num - 14 & year <= horizon_num + 15,
+    "simulation",
+    "warmup"
+  )]
+  
+  # Optional cleanup
+  dt[, c("year", "horizon_num") := NULL]
+  
+  return(dt)
+}
+
+export_discharge_per_scenario_horizon <- function(dt, output_dir, source = "discharge", scenario_horizons) {
+  # Create output folder
+  export_dir <- file.path(output_dir, source)
+  
+  if (!dir.exists(export_dir)) {
+    dir.create(export_dir, recursive = TRUE)
+  }
+  
+  # Export one file per scenario-variant-horizon combo
+  dt[, {
+    # Define filename based on horizon + scenario + variant
+    file_name <- if (horizon == "ref") {
+      "Reference"
+    } else if (horizon == "hindcast") {
+      "Hindcast"
+    } else if (horizon == "observation") {
+      "Observation"
+    } else {
+      paste0(scenario,
+             ifelse(variant == "dry", "d",
+                    ifelse(variant == "wet", "n", "")),
+             "_", horizon)
+    }
+    
+    # Define file paths
+    file_path_csv <- file.path(export_dir, paste0(file_name, ".csv"))
+    file_path_rds <- file.path(export_dir, paste0(file_name, ".rds"))
+    
+    # Select and write export data
+    export_data <- .SD[, .(station, date, discharge, unit, horizon, scenario,
+                           variant, member, scen_var, scen_var_hor, period, hydro_model, source)]
+    
+    fwrite(export_data, file_path_csv)
+    saveRDS(export_data, file_path_rds)
+  }, by = .(scenario, variant, horizon)]
+  
+  message("Export discharge per scenario-horizon successful for: ", paste(scenario_horizons, collapse = " "))
+}
+
+export_discharge_per_station <- function(dt, output_dir, rblick_stations) {
+  
+  export_dir <- file.path(output_dir, "discharge", "Rheinblick_stations")
   
   # Ensure the output directory exists
-  if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
-  
-  # Assign start dates
-  dt[horizon == "ref", export_start := as.Date("1991-01-01")]
-  dt[horizon != "ref", export_start := as.Date(paste0(as.numeric(horizon) - 14, "-01-01"), format = "%Y-%m-%d")]
-  
-  # Assign end dates
-  dt[horizon == "ref", export_end := as.Date("2020-12-31")]
-  dt[horizon != "ref", export_end := as.Date(paste0(as.numeric(horizon) + 15, "-12-31"), format = "%Y-%m-%d")]
+  if (!dir.exists(export_dir)) dir.create(export_dir, recursive = TRUE)
   
   # Filter data based on export ranges
-  dt_filtered <- dt[date >= export_start & date <= export_end]
+  dt_filtered <- dt[station %in% rblick_stations & period == "simulation"]
+  
   
   # Export logic
   dt_filtered[, {
     # Create folder path for the station
-    station_dir <- file.path(output_dir, station)
+    station_dir <- file.path(export_dir, station)
     if (!dir.exists(station_dir)) dir.create(station_dir, recursive = TRUE)
     
     # Determine filename based on conditions
-    file_name <- if (horizon == "ref" && scenario == "none") {
+    file_name <- if (horizon == "ref") {
       "Reference"
-    } else if (horizon == "ref" && scenario == "contr") {
+    } else if (horizon == "hindcast") {
       "Hindcast"
-    } else if (horizon == "ref" && scenario == "obs") {
+    } else if (horizon == "observation") {
       "Observation"
     } else {
       paste0(scenario, 
@@ -138,13 +269,14 @@ export_discharge_data <- function(dt, output_dir) {
   }, by = .(station, scenario, variant, horizon)]
   
   # Create a subfolder for the zip files
-  zip_dir <- file.path(output_dir, "all_stations")
+  zip_dir <- file.path(export_dir, "all_stations")
   if (!dir.exists(zip_dir)) dir.create(zip_dir, recursive = TRUE)
   
   # Zip each station folder and save to all_stations
   stations <- unique(dt_filtered$station)
   for (stn in stations) {
-    stn_dir <- file.path(output_dir, stn)
+    cat("Zipping station:", stn, "\n")
+    stn_dir <- file.path(export_dir, stn)
     zip_file <- file.path(zip_dir, paste0(stn, ".zip"))
     
     # Remove existing zip file if it exists
@@ -156,23 +288,24 @@ export_discharge_data <- function(dt, output_dir) {
         flags = "-j")
   }
   
-  message("Export completed successfully.")
+  message("Export discharge per station successful.")
 }
 
 # code to read data -------------------------------------------------------
-cat("Processing knmi_discharge from:", input_dir_knmi, "\n")
+message("Processing knmi_discharge from:", input_dir_knmi)
 
 # Initialize an empty list to store all processed data
 discharge_data_list <- list()
 
+# read knmi discharge data
 # Loop over each area (gebiete)
 for (geb in gebiete) {
-  cat("Processing gebiet:", geb, "\n")
+  message("Processing gebiet:", geb)
   # Define the base path for the gebiet
   geb_path <- file.path(input_dir_knmi, geb)
   
   # Loop over each scenario
-  for (scen in scenarios) {
+  for (scen in scenario_horizons) {
     # Extract `horizon` from scenario name (last 4 digits) or use 2005 for "reference"
     if (scen == "reference") {
       scenario <- "none"
@@ -203,69 +336,97 @@ for (geb in gebiete) {
         # Extract the ensemble member number (ens1 to ens8) as a numeric value
         member <- as.numeric(sub(".*_ens([1-8])$", "\\1", basename(ens_folder)))
         
-        # Define the expected file path inside the subfolder (adjust filename if needed)
-        data_file <- file.path(ens_folder, paste0(input_file_prefix_knmi, basename(ens_folder), input_file_suffix_knmi))  # Adjust filename if needed
-        
-        discharge_long <- process_discharge_data(data_file, column_names_prevah, selected_stations, 
-                               horizon, 
-                               scenario, 
-                               variant, 
-                               member,
-                               hydro_model = "PREVAH",
-                               source = "WSL")
-        
-        # Append to the list
-        discharge_data_list[[length(discharge_data_list) + 1]] <- discharge_long
-      }
+        for (prefix in names(knmi_routing_files)) {
+          
+          station_names <- knmi_routing_files[[prefix]]  # station names for this prefix
+          column_names_prevah <- c("YYYY", "MM", "DD", station_names)  # add date columns
+          
+          # Build the expected data file
+          data_file <- file.path(ens_folder, paste0(prefix, basename(ens_folder), input_file_suffix_knmi))
+          
+          if (file.exists(data_file)) {
+            # Process the file
+            discharge_long <- process_discharge_data(
+              data_file, 
+              column_names_prevah, 
+              selected_stations,
+              horizon,
+              scenario,
+              variant,
+              member,
+              hydro_model = "PREVAH",
+              source = "WSL"
+            )
+            
+            # Append discharge_long to the list
+            discharge_data_list[[length(discharge_data_list) + 1]] <- discharge_long
+          }
+        } # prefix loop
+      } # ens_folder loop
     } else {
-      print(paste("Scenario path does not exist:", geb_path))
+      cat("Scenario path does not exist:", geb_path, "\n")
     }
+  } # scenario loop
+} # gebiete loop
+
+if (read_hindcast) {
+  message("Processing hindcast data from:", input_dir_hind)
+  # hindcast data
+  for (file_name in names(hind_routing_files)) {
+    station_names <- hind_routing_files[[file_name]]  # station names for this file
+    column_names_prevah <- c("YYYY", "MM", "DD", station_names)  # add date columns
+  
+    # Build the expected data file
+    data_file <- file.path(input_dir_hind, file_name)
+    
+    # Process the file
+    discharge_long <- process_discharge_data(data_file, column_names_prevah, selected_stations,
+                                             horizon = "hindcast",
+                                             scenario = "none",
+                                             variant = "none",
+                                             member = "none",
+                                             hydro_model = "PREVAH",
+                                             source = "WSL")
+    
+    # Append to the list
+    discharge_data_list[[length(discharge_data_list) + 1]] <- discharge_long
+  }
+}
+  
+if (read_observation) {
+  message("Processing observation data from:", input_dir_obse)
+  # observed data
+  for (file_name in names(observation_files)) {
+    station_names <- observation_files[[file_name]]  # station names for this file
+    column_names_obse <- c("YYYY", "MM", "DD", station_names)  # add date columns
+  
+    data_file <- file.path(input_dir_obse, file_name)
+    discharge_long <- process_discharge_data(data_file, column_names_obse, selected_stations,
+                                             horizon = "observation",
+                                             scenario = "none",
+                                             variant = "none",
+                                             member = "none",
+                                             hydro_model = "observed",
+                                             source = "BAFU")
+    
+    # Append to the list
+    discharge_data_list[[length(discharge_data_list) + 1]] <- discharge_long
   }
 }
 
-# # hindcast data
-# data_file <- file.path(input_dir_hind, input_file_hind)
-# discharge_long <- process_discharge_data(data_file, column_names_prevah, selected_stations, 
-#                        horizon = "ref", 
-#                        scenario = "contr", # for control run
-#                        variant = "none",
-#                        member = 1,
-#                        hydro_model = "PREVAH",
-#                        source = "WSL")
-# 
-# # Append to the list
-# discharge_data_list[[length(discharge_data_list) + 1]] <- discharge_long
-# 
-# # observed data
-# data_file <- file.path(input_dir_obse, input_file_obse)
-# discharge_long <- process_discharge_data(data_file, column_names_obse, selected_stations, 
-#                        horizon = "ref", 
-#                        scenario = "obs", 
-#                        variant = "none",
-#                        member = 1,
-#                        hydro_model = "observed",
-#                        source = "BAFU")
-# 
-# # Append to the list
-# discharge_data_list[[length(discharge_data_list) + 1]] <- discharge_long
-
 # Combine all knmi data into a single data.table
 knmi_discharge_dt <- rbindlist(discharge_data_list, use.names = TRUE, fill = TRUE)
-
-if (!dir.exists(output_dir)) {
-  dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
-}
 
 # export processed data --------------------------------------------------
 if (!dir.exists(output_dir)) {
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 }
-# Export to .RDS format
-saveRDS(knmi_discharge_dt, file.path(output_dir, paste0(output_file_name, ".rds")))
 
-# Export to CSV
-write.csv2(knmi_discharge_dt, file.path(output_dir, paste0(output_file_name, ".csv")), row.names = FALSE, quote = FALSE)
+# Export to CSV files per scenario-variant-horizon combination
+export_discharge_per_scenario_horizon(knmi_discharge_dt, output_dir, "discharge", scenario_horizons)
 
-# Export to individual CSV files for scenario-variant-horizon combination
-export_discharge_data(knmi_discharge_dt, output_dir)
+# Export to individual CSV files per station for scenario-variant-horizon combination
+export_discharge_per_station(knmi_discharge_dt, output_dir, rblick_stations)
+
+
         

@@ -259,7 +259,7 @@ select_mean_chain_by_rcp <- function(annual_dt) {
 }
 
 # export glchain as text file
-write_best_glchains_to_file <- function(best_match_dt, mean_chain_dt, output_dir, file_name) {
+write_best_glchains_to_file <- function(best_match_dt, mean_chain_dt, mean_chain_ref_dt, output_dir, file_name) {
   # Create output directories if they don't exist
   dir.create(file.path(output_dir, "scenario_ens_glchain"), recursive = TRUE, showWarnings = FALSE)
   
@@ -268,7 +268,7 @@ write_best_glchains_to_file <- function(best_match_dt, mean_chain_dt, output_dir
     "# High" = c("Hd_2050", "Hd_2100", "Hd_2150", "Hn_2050", "Hn_2100", "Hn_2150"),
     "# Low" = c("L_2033", "Ld_2100", "Ln_2100"),
     "# Moderate" = c("Md_2050", "Md_2100", "Md_2150", "Mn_2050", "Mn_2100", "Mn_2150"),
-    "# reference" = character(0)
+    "# reference" = c("reference")
   )
   
   # For the full list file
@@ -281,7 +281,20 @@ write_best_glchains_to_file <- function(best_match_dt, mean_chain_dt, output_dir
     for (scenario in scenario_groups[[group]]) {
       lines <- c(lines, paste("#", scenario))
       
-      if (grepl("2150$", scenario)) {
+      if (scenario == "reference") {
+        # Special handling for reference scenario
+        gl <- mean_chain_ref_dt[RCP == "RCP26", glchain][1]
+        
+        for (ens in paste0("ens", 1:8)) {
+          # Write single file for each scenario_ens
+          filename <- file.path(output_dir, "scenario_ens_glchain", paste0(scenario, "_", ens, ".txt"))
+          writeLines(gl, filename)
+          
+          # Add to the big glchain list
+          lines <- c(lines, gl)
+        }
+        
+      } else if (grepl("2150$", scenario)) {
         # Special handling for 2150 horizon scenarios
         rcp <- if (grepl("^M", scenario)) "RCP45" else if (grepl("^H", scenario)) "RCP85" else NA_character_
         gl <- mean_chain_dt[RCP == rcp, glchain][1]  # use the first match
@@ -392,9 +405,17 @@ annual_10yr_dt <- compute_annual_means(
   n_years = 10
 )
 
+annual_10yr_ref_dt <- compute_annual_means(
+  ch2018_meteo_dt,
+  start_year = 1990,
+  end_year = 2020,
+  n_years = 10
+)
+
 # Select median chain by RCP for horizon 2150
 mean_chain_5yr_dt <- select_mean_chain_by_rcp(annual_5yr_dt)
 mean_chain_10yr_dt <- select_mean_chain_by_rcp(annual_10yr_dt)
+mean_chain_10yr_ref_dt <- select_mean_chain_by_rcp(annual_10yr_ref_dt)
 
 for (rcp in unique(annual_5yr_dt$RCP)) {
   plot_rcp_chains(
@@ -411,11 +432,20 @@ for (rcp in unique(annual_5yr_dt$RCP)) {
     value_col = "tair_smooth",
     info_text = "10yr_rmse"
   )
+  
+  plot_rcp_chains(
+    annual_10yr_ref_dt,
+    mean_chain_10yr_ref_dt,
+    rcp_name = rcp,
+    value_col = "tair_smooth",
+    info_text = "10yr_rmse_ref"
+  )
 }
 
 write_best_glchains_to_file(
   best_match_overall_dt,
   mean_chain_10yr_dt,
+  mean_chain_10yr_ref_dt,
   output_dir,
   "glchains_overall.txt"
 )
@@ -423,6 +453,7 @@ write_best_glchains_to_file(
 write_best_glchains_to_file(
   best_match_scenario_dt,
   mean_chain_10yr_dt,
+  mean_chain_10yr_ref_dt,
   output_dir,
   "glchains_scenario.txt"
 )

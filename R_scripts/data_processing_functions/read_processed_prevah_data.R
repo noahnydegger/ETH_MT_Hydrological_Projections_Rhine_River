@@ -9,9 +9,10 @@ knmi_variables <- list(
                             combine = FALSE, combine_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "mit_output")),
  
   knmi_meteo_stat_dt = list(read = FALSE, read_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "prevah_meteo_stat_knmi.rds"),
-                            combine = TRUE, combine_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "meteo_stat")),
+                            combine = FALSE, combine_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "meteo_stat")),
   
-  knmi_discharge_dt = list(read = FALSE, read_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "prevah_discharge_stat_knmi.rds")),
+  knmi_discharge_dt = list(read = FALSE, read_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "prevah_discharge_knmi.rds"),
+                           combine = TRUE, combine_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "discharge")),
   
   knmi_discharge_dt_rblick = list(read = FALSE, read_dir = "path/to/discharge_data.rds")
 )
@@ -68,7 +69,13 @@ combine_rds_scenario_data <- function(var_list) {
     )
     
     # Order the combined data
-    data.table::setorder(combined_dt, horizon, scenario, variant, member, basin, date)
+    if ("basin" %in% colnames(combined_dt)) {
+      data.table::setorder(combined_dt, horizon, scenario, variant, member, basin, date)
+    } else if ("station" %in% colnames(combined_dt)) {
+      data.table::setorder(combined_dt, horizon, scenario, variant, member, station, date)
+    } else {
+      data.table::setorder(combined_dt, horizon, scenario, variant, member, date)
+    }
     
     # Assign to global variable and save as .rds
     assign(varname, combined_dt, envir = .GlobalEnv)

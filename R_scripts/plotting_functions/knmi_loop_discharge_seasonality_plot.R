@@ -35,6 +35,10 @@ add_scenario_horizon_grouping_columns <- function(dt) {
 #knmi_discharge_dt_all <- as.data.table(readRDS(file.path(here::here(),"Data", "Rheinblick2027", "processed_discharge_data", "knmi_discharge_data.rds")))
 add_scenario_horizon_grouping_columns(knmi_discharge_dt_all)
 
+home_dir <-file.path(here::here())
+
+plot_dir <- file.path(home_dir, "Plots", "Reference_Period_Analysis", "no_sund_BC")
+
 show_range <- FALSE
 show_ensemble <- FALSE
 q_bot <- 0.25
@@ -81,7 +85,7 @@ for (stat in statistics) {
       cat("Plotting seasonality for", stn, value_col, "\n")
       
       info_col <- sub("rm_", "", value_col)
-      plot_seasonality_ts(dt, stn, info_col, color_col, value_col, stat, info_text, show_ensemble = show_ensemble, show_range = show_range, gof_pairs = gof_pairs)
+      plot_seasonality_ts(dt, plot_dir, stn, info_col, color_col, value_col, stat, info_text, show_ensemble = show_ensemble, show_range = show_range, gof_pairs = gof_pairs)
     } # value_col loop
   } # station loop
 } # stat loop

@@ -3,7 +3,7 @@ library(data.table)
 
 source(here("R_scripts", "plotting_functions", "knmi_plot_metadata.R"))
 
-plot_scatter_xy <- function(dt, bsn, color_col, value_col_x, value_col_y, group) {
+plot_scatter_xy <- function(dt, plot_dir, bsn, color_col, value_col_x, value_col_y, group) {
   
   x_name <- plot_info$column_info$names[[value_col_x]]
   x_unit <- plot_info$column_info$units[[value_col_x]]
@@ -25,12 +25,12 @@ plot_scatter_xy <- function(dt, bsn, color_col, value_col_x, value_col_y, group)
     )
   
   # Save the plot
-  save_dir <- file.path(here::here(), "Plots", "Reference_Period_Analysis", "bias_correction", "Scatter")
+  save_dir <- file.path(plot_dir, "Scatter")
   filename <- paste0("scatter_xy_", bsn, "_", value_col_x, "_vs_", value_col_y, "_", group, ".pdf")
   save_plot(p, save_dir, filename, width = 8, height = 6)
 }
 
-plot_scatter_group <- function(dt, bsn, color_col, value_col, group_col, groups) {
+plot_scatter_group <- function(dt, plot_dir, bsn, color_col, value_col, group_col, groups) {
   stopifnot(length(groups) == 2)
   
   # Extract values for each group
@@ -60,7 +60,7 @@ plot_scatter_group <- function(dt, bsn, color_col, value_col, group_col, groups)
     custom_theme()
   
   # Save the plot
-  save_dir <- file.path(here::here(), "Plots", "Reference_Period_Analysis", "bias_correction", "Scatter")
+  save_dir <- file.path(plot_dir, "Scatter")
   filename <- paste0("scatter_groups_", bsn, "_", groups[1], "_vs_", groups[2], "_", value_col, ".pdf")
   save_plot(p, save_dir, filename, width = 8, height = 6)
 }

@@ -4,9 +4,11 @@ library(data.table)
 # project directory
 home_dir <- file.path(here::here())
 
+run_type <- "no_sund_bc"
+
 # input directories
-input_dir_knmi <- file.path(home_dir, "Data", "Rheinblick2027", "raw_prevah_output", "routing")
-input_dir_hind <- file.path(home_dir, "Data", "Rheinblick2027", "raw_prevah_output", "routing", "hindcast", "CTRL_RUN_WSL_F_2021_g73")
+input_dir_knmi <- file.path(home_dir, "Data", "Rheinblick2027", "raw_prevah_output", paste0("routing", "_", run_type))
+input_dir_hind <- file.path(home_dir, "Data", "Rheinblick2027", "raw_prevah_output", paste0("routing", "_", run_type), "hindcast", "CTRL_RUN_WSL_F_2021_g73")
 input_dir_obse <- file.path(home_dir, "Data", "Rheinblick2027", "discharge_measurements", "CHBILANZ")
 
 # output directory
@@ -79,7 +81,7 @@ read_raw_discharge_data <- function(file_path, column_names) {
   return(raw_data)
 }
 
-process_discharge_data <- function(data_file, column_names, selected_stations, horizon, scenario, variant, member, hydro_model, source) {
+process_discharge_data <- function(data_file, column_names, selected_stations, horizon, scenario, variant, member, hydro_model, source, run_type) {
   # Check if the file exists before reading
   if (file.exists(data_file)) {
     
@@ -103,7 +105,8 @@ process_discharge_data <- function(data_file, column_names, selected_stations, h
       variant = variant,
       member = member,
       hydro_model = hydro_model,
-      source = source
+      source = source,
+      run_type = run_type
     )]
     
     discharge_long <- add_scenario_horizon_grouping_columns(discharge_long)
@@ -112,7 +115,7 @@ process_discharge_data <- function(data_file, column_names, selected_stations, h
     prevah_date_cols <- c("YYYY", "MM", "DD")
     prevah_general_cols <- c("station")
     rblick_date_cols <- c("date")
-    rblick_cols <- c("horizon", "scenario", "variant", "member", "scen_var", "scen_var_hor", "period", "hydro_model", "source")
+    rblick_cols <- c("horizon", "scenario", "variant", "member", "scen_var", "scen_var_hor", "period", "run_type", "hydro_model", "source")
     
     non_value_col <- c(prevah_date_cols, prevah_general_cols, rblick_date_cols, rblick_cols)
     
@@ -216,7 +219,7 @@ export_discharge_per_scenario_horizon <- function(dt, output_dir, source = "disc
     
     # Select and write export data
     export_data <- .SD[, .(station, date, discharge, unit, horizon, scenario,
-                           variant, member, scen_var, scen_var_hor, period, hydro_model, source)]
+                           variant, member, scen_var, scen_var_hor, period, run_type, hydro_model, source)]
     
     fwrite(export_data, file_path_csv)
     saveRDS(export_data, file_path_rds)
@@ -355,7 +358,8 @@ for (geb in gebiete) {
               variant,
               member,
               hydro_model = "PREVAH",
-              source = "WSL"
+              source = "WSL",
+              run_type = run_type
             )
             
             # Append discharge_long to the list
@@ -386,7 +390,8 @@ if (read_hindcast) {
                                              variant = "none",
                                              member = "none",
                                              hydro_model = "PREVAH",
-                                             source = "WSL")
+                                             source = "WSL",
+                                             run_type = "none")
     
     # Append to the list
     discharge_data_list[[length(discharge_data_list) + 1]] <- discharge_long
@@ -406,8 +411,9 @@ if (read_observation) {
                                              scenario = "none",
                                              variant = "none",
                                              member = "none",
-                                             hydro_model = "observed",
-                                             source = "BAFU")
+                                             hydro_model = "observation",
+                                             source = "BAFU",
+                                             run_type = "none")
     
     # Append to the list
     discharge_data_list[[length(discharge_data_list) + 1]] <- discharge_long

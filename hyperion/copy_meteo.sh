@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Define the base remote and local directories
-REMOTE_BASE="nydegger@hyperion.wsl.ch:/home/nydegger/Rheinblick/meteo"
-LOCAL_BASE="/Volumes/MT_case_sensitive/ETH_MT_Hydrological_Projections_Rhine_River/Data/Rheinblick2027/meteo"
+REMOTE_BASE="nydegger@hyperion.wsl.ch:/home/schirmer/Rheinblick/meteo"
+LOCAL_BASE="/Volumes/MT_case_sensitive/ETH_MT_Hydrological_Projections_Rhine_River/Data/Rheinblick2027/meteo_schirmer"
 
 # Allow specifying ens and scenario (use provided arguments or defaults)
 SCENARIO="${2:-reference}"  # Default to 'reference' if not provided
@@ -16,7 +16,7 @@ mkdir -p "$LOCAL_DIR"
 
 # Define the year range
 start_year=1983
-end_year=2020
+end_year=1983
 
 for ENS in ens{1..1}; do
     for ((YEAR=start_year; YEAR<=end_year; YEAR++)); do
@@ -26,21 +26,22 @@ for ENS in ens{1..1}; do
         mkdir -p "$LOCAL_DIR_YEAR"
         rsync -avzL \
             --include='*/' \
-            --include="*prec*.2km" \
-            --include="*tair*.2km" \
-            --include="*rhum*.2km" \
-            --include="*wspd*.2km" \
+            --include="*sdbc*.2km" \
             --exclude="*" \
             "$REMOTE_DIR_YEAR/" "$LOCAL_DIR_YEAR/"
     done
 done
 
-#--include="*radg*.2km" \
-#--include="*sund*.2km" \
+# --include="*radg*.2km" \
+# --include="*sund*.2km" \
+# --include="*prec*.2km" \
+# --include="*tair*.2km" \
+# --include="*rhum*.2km" \
+# --include="*wspd*.2km" \
 
 # Check if the command was successful
 if [ $? -eq 0 ]; then
-    echo "Successfully copied files matching '$FILTER' from $REMOTE_DIR to $LOCAL_DIR"
+    echo "Successfully copied files from $REMOTE_DIR to $LOCAL_DIR"
 else
     echo "Error occurred during the file transfer."
 fi

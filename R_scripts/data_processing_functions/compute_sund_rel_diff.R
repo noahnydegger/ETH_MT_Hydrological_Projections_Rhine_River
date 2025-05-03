@@ -6,8 +6,6 @@ library(ncdf4)
 library(terra)
 library(geosphere)
 
-#plan(multisession, workers = 8)
-
 # project directory
 home_dir <- file.path(here::here())
 
@@ -20,17 +18,7 @@ output_dir <- file.path(home_dir, "Data", "Rheinblick2027", "processed_meteo")
 input_file_suffix <- ".nc"
 
 scenario_horizons <- c(
-  "reference"
-)
-
-meteo_variables_knmi <- c(
-  "sund" = "sund_rel"
-  #"radg" = "radg_abs"
-)
-
-meteo_variables_hind <- c(
-  "ssd_" = "sund_abs"
-  #"rad_" = "radg_abs"
+  "Hd_2100"
 )
 
 ensembles <- paste0("ens", 1:8)
@@ -40,13 +28,6 @@ basin <- "hydro_CH"
 
 
 # functions ---------------------------------------------------------------
-read_and_convert_prevah_bin_raster <- function(file, crop_ext_vec = NULL) {
-  r <- rast(read.prevah(file))  # Read and convert
-  if (!is.null(crop_ext_vec)) {
-    r <- crop(r, ext(crop_ext_vec))
-  }
-  return(r)
-}
 
 read_nc_raster <- function(input_dir, scenario, ensemble = NULL, variable) {
   
@@ -59,39 +40,6 @@ read_nc_raster <- function(input_dir, scenario, ensemble = NULL, variable) {
   file_path <- file.path(var_path, paste0(scenario, "_", variable, input_file_suffix))
   r <- rast(file_path)
   return(r)
-}
-
-get_center_lat_from_raster <- function(r) {
-  stopifnot(inherits(r, "SpatRaster"))
-  
-  # Get center of raster in native CRS using numeric index
-  ex <- ext(r)
-  center_coords <- c((ex[1] + ex[2]) / 2, (ex[3] + ex[4]) / 2)
-  
-  # Create center point geometry in raster CRS
-  center_point <- vect(matrix(center_coords, ncol = 2), type = "points", crs = crs(r))
-  
-  # Check if CRS is already WGS84 (EPSG:4326)
-  if (crs(r) != "EPSG:4326") {
-    center_point <- project(center_point, "EPSG:4326")
-  }
-  
-  # Return latitude (y)
-  return(geom(center_point)[, "y"])
-}
-
-crop_by_raster <- function(r_stack, crop_shape_path) {
-  crop_shape <- read_and_convert_prevah_bin_raster(crop_shape_path)
-  cropped <- crop(r_stack, crop_shape)
-  return(cropped)
-}
-
-crop_and_mask_by_polygon <- function(r_stack, crop_shape_path) {
-  crop_shape <- vect(crop_shape_path)
-  crop_shape <- project(crop_shape, crs(r_stack))
-  
-  masked <- mask(crop(r_stack, crop_shape), crop_shape)
-  return(masked)
 }
 
 resample_to_knmi_grid_hind_ext <- function(r_stack, hind_rast_path, knmi_rast_path) {
@@ -131,7 +79,47 @@ stack_mean_value <- function(r_stack) {
   global(r_stack, "mean", na.rm = TRUE)[1, 1]
 }
 
-compute_sund_stats_parallel <- function(
+# apply bias_correct_sund_rel and export_to_netcdf functions
+sund_bc_export <- function(
+    data_dir,
+    output_dir,
+    scenario,
+    pattern = ".*sund_rel_crop.*\\.nc$",
+    suffix = "_bc"
+) {
+  files <- list.files(data_dir, pattern = pattern, full.names = TRUE, recursive = TRUE)
+  if (length(files) == 0) stop("No files found.")
+  
+  plan(multisession, workers = 8)
+  
+  process_and_export <- function(file) {
+    cat("[", format(Sys.time(), "%H:%M:%S"), "] bias correct file ", basename(file), " \n")
+    r_stack <- rast(file)
+    r_stack_bc <- bias_correct_sund_rel(r_stack)
+    
+    # Extract ensemble from filename
+    ens_match <- regmatches(file, regexpr("ens\\d+", file))
+    ensemble <- if (length(ens_match) == 0 || ens_match == "") "none" else ens_match
+    
+    cat("[", format(Sys.time(), "%H:%M:%S"), "] export ", basename(file), "_bc \n")
+    # Export corrected raster
+    export_to_netcdf(
+      r_stack = r_stack_bc,
+      out_dir = output_dir,
+      scenario = scenario,
+      ensemble = ensemble,
+      varname = "sund_rel",
+      varunit = "%",
+      suffix = suffix
+    )
+    
+    return(file)
+  }
+  
+  invisible(future_lapply(files, process_and_export))
+}
+
+compute_sund_stats_parallel_hindcast <- function(
     chunk_dir,
     crop_shape_path,
     pattern = ".*sund_rel_chunk_.*\\.nc$"
@@ -189,28 +177,52 @@ compute_sund_stats_parallel <- function(
   return(sund_stats_dt)
 }
 
-export_to_netcdf <- function(r_stack, out_dir, scenario, ensemble, varname, varunit = "units") {
+compute_sund_stats_parallel <- function(
+    data_dir,
+    scenario,
+    pattern = ".*sund_rel.*\\.nc$"
+) {
+  files <- list.files(data_dir, pattern = pattern, full.names = TRUE)
+  if (length(files) == 0) stop("No files found.")
   
-  save_dir <- file.path(out_dir, scenario, varname)
-  # Ensure the directory exists
-  if (!dir.exists(save_dir)) {
-    dir.create(save_dir, recursive = TRUE, showWarnings = FALSE)
+  plan(multisession, workers = 8)
+  
+  process_chunk <- function(file) {
+    r_stack <- rast(file)
+    
+    r_stack_bc <- bias_correct_sund_rel(r_stack)
+    
+    # 3. Compute per-layer means
+    dates <- time(r_stack)
+    sund_means <- global(r_stack, "mean", na.rm = TRUE)[, 1]
+    sund_means_bc <- global(r_stack_bc, "mean", na.rm = TRUE)[, 1]
+    #sund_means_res <- global(r_resample_crop, "mean", na.rm = TRUE)[, 1]
+    #logit_means_res <- global(r_resample_logit, "mean", na.rm = TRUE)[, 1]
+    
+    # Extract ensemble from filename
+    ens_match <- regmatches(file, regexpr("ens\\d+", file))
+    ensemble <- if (length(ens_match) == 0 || ens_match == "") "none" else ens_match
+    
+    # 4. Store results in DT
+    data.table(
+      date = as.Date(dates),
+      member = ensemble,
+      sund_rel = sund_means,
+      sund_rel_bc = sund_means_bc
+    )
   }
-  file_name <- if (scenario == "hindcast") {
-    paste0(scenario, "_", varname, ".nc")
-  } else {
-    paste0(scenario, "_", ensemble, "_", varname, ".nc")
-  }
-  writeCDF(
-    x = r_stack,
-    filename = file.path(save_dir, file_name),
-    varname = varname,
-    unit = varunit,
-    overwrite = TRUE,
-    zname = "time",
-    compression = 4
-  )
-  message("Exported NetCDF: ", file_name)
+  
+  # Process all chunks in parallel
+  dt_list <- future_lapply(files, process_chunk)
+  
+  # Combine results
+  sund_stats_dt <- rbindlist(dt_list)
+  setorder(sund_stats_dt, member, date)
+  
+  fwrite(sund_stats_dt, file.path(data_dir, paste0(scenario, "_sund_rel_stats.csv")))
+  saveRDS(sund_stats_dt, file.path(data_dir, paste0(scenario, "_sund_rel_stats.rds")))
+  
+  return(sund_stats_dt)
 }
 
 # Function to add 'scenario_variant' and 'scenario_variant_horizon' columns with custom ordering
@@ -236,7 +248,7 @@ add_scenario_horizon_grouping_columns <- function(dt) {
     "L_dry_2100",
     "L_wet_2100",
     "L_none_2033",
-    "none_none_ref", "none_none_hindcast", "none_none_observed"
+    "none_none_ref", "none_none_hindcast", "none_none_observation"
   )
   
   # Convert scen_var and scen_var_hor to factors with defined levels
@@ -250,44 +262,7 @@ add_scenario_horizon_grouping_columns <- function(dt) {
 
 # code to read data -------------------------------------------------------
 # ----------------------------
-# Step 1: Get center latitude from hindcast raster
-# ----------------------------
-
-extents_dir <- file.path(input_dir_meteo, "extents")
-
-hind_rast_path <- file.path(extents_dir, "ssd_19910101.2km")
-knmi_rast_path <- file.path(extents_dir, "sund19910101.2km")
-rhine_bsn_path <- file.path(extents_dir, "cchydro_Rhine_basin.shp")
-
-hind_rast <- read_and_convert_prevah_bin_raster(hind_rast_path)
-knmi_rast <- read_and_convert_prevah_bin_raster(knmi_rast_path)
-rhine_bsn_shp <- vect(rhine_bsn_path)
-
-rhine_basin_shp <- project(rhine_basin_shp, crs(hind_rast))
-knmi_rast_crop <- crop(knmi_rast, hind_rast)
-hind_rast_res <- resample(hind_rast, knmi_rast_crop, method = "bilinear")
-
-hind_ext_vec <- as.vector(ext(ssd__rast))
-knmi_ext_vec <- as.vector(ext(knmi_rast))
-
-center_lat <- get_center_lat_from_raster(hind_rast)
-
-# # Create extent rectangles as SpatVector objects
-# e1 <- as.polygons(ext(knmi_rast));       crs(e1) <- crs(knmi_rast)
-# e2 <- as.polygons(ext(knmi_rast_crop));  crs(e2) <- crs(knmi_rast_crop)
-# e3 <- as.polygons(ext(hind_rast_res));       crs(e3) <- crs(hind_rast_res)
-# shp <- as.polygons(rhine_basin_shp); crs(shp) <- crs(rhine_basin_shp)
-# 
-# # Plot all in one figure
-# plot(e1, border = "black", lwd = 2, main = "Raster Extents")  # full extent
-# plot(e2, border = "blue",  lwd = 2, main = "Raster Extents")  
-# plot(e3, border = "red",   lwd = 2, add = TRUE)                # hindcast
-# plot(shp, border = "green", lwd = 2, add = TRUE)
-# legend("topright", legend = c("KNMI crop", "Hindcast"),
-#        col = c("blue", "red"), lwd = 2, bg = "white")
-
-# ----------------------------
-# Step 2: Process hindcast
+# Step 1: Process hindcast
 # ----------------------------
 message("Processing hindcast scenario")
 
@@ -300,12 +275,13 @@ message("Processing hindcast scenario")
 # resample to knmi 12 km grid
 hindcast_r_stack_rel <- resample(hindcast_r_stack_rel, hind_rast_res, method = "bilinear")
 
-# compute relative and logit mean
-message("[", format(Sys.time(), "%H:%M:%S"), "] computing hindcast stats")
+# compute mean and bc mean
+scenario <- "hindcast"
+message("[", format(Sys.time(), "%H:%M:%S"), "] computing ", scenario, " stats")
 hindcast_sund_stats <- compute_sund_stats_parallel(
-  chunk_dir = file.path(input_dir, "hindcast", "sund_rel"),
-  crop_shape_path = rhine_bsn_path,
-  pattern = ".*sund_rel_chunk.*\\.nc$"
+  data_dir = file.path(output_dir, scenario, "sund_rel_crop"),
+  scenario = scenario,
+  pattern = ".*sund_rel_crop.*\\.nc$"
 )
 message("[", format(Sys.time(), "%H:%M:%S"), "] stats computed")
 
@@ -313,7 +289,8 @@ hindcast_sund_stats[, `:=`(
   basin = "hydro_CH",
   scenario = "none",
   variant = "none",
-  horizon = "hindcast"
+  horizon = "hindcast",
+  sund_rel_bc = sund_rel
 )]
 
 setnames(hindcast_sund_stats, old = "ensemble", new = "member")
@@ -325,12 +302,22 @@ hindcast_files_dt <- add_scenario_horizon_grouping_columns(hindcast_sund_stats)
 # ----------------------------
 message("Processing reference scenario")
 
-# compute relative and logit mean
-message("[", format(Sys.time(), "%H:%M:%S"), "] computing reference stats")
+scenario <- "reference"
+sund_bc_export(
+  data_dir = file.path(output_dir, scenario, "sund_rel_crop"),
+  output_dir = output_dir,
+  scenario = scenario,
+  pattern = ".*sund_rel_crop.*\\.nc$",
+  suffix = "_bc"
+)
+
+# compute mean and bc mean
+scenario <- "reference"
+message("[", format(Sys.time(), "%H:%M:%S"), "] computing ", scenario, " stats")
 reference_sund_stats <- compute_sund_stats_parallel(
-  chunk_dir = file.path(input_dir, "reference", "sund_rel"),
-  crop_shape_path = rhine_bsn_path,
-  pattern = ".*sund_rel_chunk_.*\\.nc$"
+  data_dir = file.path(output_dir, scenario, "sund_rel_crop"),
+  scenario = scenario,
+  pattern = ".*sund_rel_crop.*\\.nc$"
 )
 message("[", format(Sys.time(), "%H:%M:%S"), "] stats computed")
 
@@ -341,19 +328,30 @@ reference_sund_stats[, `:=`(
   horizon = "ref"
 )]
 
-reference_sund_stats[, `:=`(
-  sund_rel_res = sund_rel_raw,
-  sund_logit_res = sund_logit_raw
+reference_sund_stats <- add_scenario_horizon_grouping_columns(reference_sund_stats)
+
+# compute mean and bc mean
+scenario <- "Hd_2100"
+message("[", format(Sys.time(), "%H:%M:%S"), "] computing ", scenario, " stats")
+Hd_2100_sund_stats <- compute_sund_stats_parallel(
+  data_dir = file.path(output_dir, scenario, "sund_rel_crop"),
+  scenario = scenario,
+  pattern = ".*sund_rel_crop.*\\.nc$"
+)
+message("[", format(Sys.time(), "%H:%M:%S"), "] stats computed")
+
+Hd_2100_sund_stats[, `:=`(
+  basin = "hydro_CH",
+  scenario = "H",
+  variant = "dry",
+  horizon = "2100"
 )]
 
-setnames(reference_sund_stats, old = "ensemble", new = "member")
-
-reference_sund_stats <- add_scenario_horizon_grouping_columns(reference_sund_stats)
+Hd_2100_sund_stats <- add_scenario_horizon_grouping_columns(Hd_2100_sund_stats)
 # ----------------------------
 # Step 4: Compute mean difference
 # ----------------------------
-sund_stats_dt <- rbind(hindcast_sund_stats, reference_sund_stats,
-                        use.names = TRUE, fill = FALSE)
+sund_stats_dt <- rbind(hindcast_sund_stats, reference_sund_stats, Hd_2100_sund_stats, use.names = TRUE, fill = FALSE)
 hindcast_logit_raw_mean <- hindcast_sund_stats[, mean(sund_logit_raw, na.rm = TRUE)]
 hindcast_logit_res_mean <- hindcast_sund_stats[, mean(sund_logit_res, na.rm = TRUE)]
 
@@ -366,25 +364,28 @@ logit_diff_res <- reference_logit_mean - hindcast_logit_res_mean
 # Step 5: Create Plots
 # ----------------------------
 
+plot_dir <- file.path(home_dir, "Plots", "Reference_Period_Analysis", "bias_correction")
+
+# cdf plot -----------------------------------------------------
 source(here("R_scripts", "plotting_functions", "plot_pdf_cdf.R"))
 basins <- unique(sund_stats_dt$basin)
 color_col <- "scen_var_hor"
 group_cols <- c("scenario", "variant", "horizon")
-value_cols <- c("sund_rel_bc_raw", "sund_rel_bc_res", "sund_rel_raw", "sund_rel_res", "sund_logit_raw", "sund_logit_res")
+value_cols <- c("sund_rel", "sund_rel_bc")
 info_col <- c("sund_rel_mean")
 for (bsn in basins) {
   dt <- sund_stats_dt[basin == bsn]
   for (value_col in value_cols) {
     cat("Plotting cdf for", bsn, value_col, "\n")
     
-    plot_cdf(dt, bsn, info_col, color_col, value_col, group_cols)
+    plot_cdf(dt, plot_dir, bsn, info_col, color_col, value_col, group_cols)
   }
 } # basin loop
 
-
+# seasonality plot -----------------------------------------------------
 source(here("R_scripts", "plotting_functions", "plot_seasonality.R"))
 group_cols <- c("basin", "scen_var_hor")
-value_cols <- c("sund_rel_bc_raw", "sund_rel_bc_res", "sund_rel_raw", "sund_rel_res", "sund_logit_raw", "sund_logit_res")
+value_cols <- c("sund_rel", "sund_rel_bc")
 color_col <- "scen_var_hor"
 
 gof_pairs <- c("none_none_hindcast", "none_none_ref")
@@ -406,7 +407,7 @@ for (stat in c("mean")) {
       
       info_col <- c("sund_rel_mean")
       
-      plot_seasonality_ts(dt, bsn, info_col, color_col, value_col, stat, info_text = "_rast_bc", gof_pairs = gof_pairs)
+      plot_seasonality_ts(dt, plot_dir, bsn, info_col, color_col, value_col, stat, info_text = "_rast_bc", gof_pairs = gof_pairs)
       
     } # value_col loop
   } # basin loop

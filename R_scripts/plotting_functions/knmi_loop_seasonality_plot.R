@@ -1,4 +1,8 @@
 
+home_dir <-file.path(here::here())
+
+plot_dir <- file.path(home_dir, "Plots", "Reference_Period_Analysis", "no_sund_BC")
+
 # select the dataset to plot: mit_output, meteo_stat, discharge
 dataset <- "meteo_stat"
 
@@ -63,7 +67,7 @@ for (stat in statistics) {
       cat("Plotting seasonality for", bsn, value_col, "\n")
       
       info_col <- sub("rm_", "", value_col)
-      plot_seasonality_ts(dt, bsn, info_col, color_col, value_col, stat, show_ensemble = show_ensemble, show_range = show_range, gof_pairs = gof_pairs)
+      plot_seasonality_ts(dt, plot_dir, bsn, info_col, color_col, value_col, stat, show_ensemble = show_ensemble, show_range = show_range, gof_pairs = gof_pairs)
     } # value_col loop
   } # basin loop
 } # stat loop

@@ -4,7 +4,7 @@ library(data.table)
 source(here("R_scripts", "plotting_functions", "knmi_plot_metadata.R"))
 
 # PDF Plot Function
-plot_pdf <- function(dt, bsn, color_col, value_col, group_cols) {
+plot_pdf <- function(dt, plot_dir, bsn, color_col, value_col, group_cols) {
   
   value_name <- plot_info$column_info$names[[value_col]]
   value_unit <- plot_info$column_info$units[[value_col]]
@@ -27,13 +27,13 @@ plot_pdf <- function(dt, bsn, color_col, value_col, group_cols) {
     )
   
   # Save the plot
-  save_dir <- file.path(here::here(), "Plots", "Reference_Period_Analysis", "bias_correction", "Distribution", value_col)
+  save_dir <- file.path(plot_dir, "Distribution", value_col)
   filename <- paste0("pdf_", bsn, "_", value_col, ".pdf")
   save_plot(p, save_dir, filename, width = 8, height = 6)
 }
 
 # CDF Plot Function
-plot_cdf <- function(dt, bsn, info_col, color_col, value_col, group_cols) {
+plot_cdf <- function(dt, plot_dir, bsn, info_col, color_col, value_col, group_cols) {
   
   value_name <- plot_info$column_info$names[[info_col]]
   value_unit <- plot_info$column_info$units[[info_col]]
@@ -57,7 +57,7 @@ plot_cdf <- function(dt, bsn, info_col, color_col, value_col, group_cols) {
     )
   
   # Save the plot
-  save_dir <- file.path(here::here(), "Plots", "Reference_Period_Analysis", "bias_correction", "Distribution", value_col)
+  save_dir <- file.path(plot_dir, "Distribution", value_col)
   filename <- paste0("cdf_", bsn, "_", value_col, ".pdf")
   save_plot(p, save_dir, filename, width = 8, height = 6)
 }

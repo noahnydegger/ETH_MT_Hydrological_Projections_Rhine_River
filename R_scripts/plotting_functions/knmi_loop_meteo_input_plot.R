@@ -29,6 +29,10 @@ add_scenario_horizon_grouping_columns <- function(dt) {
   dt[, scen_var_hor := factor(scen_var_hor, levels = scen_var_hor_order)]
 }
 
+home_dir <-file.path(here::here())
+
+plot_dir <- file.path(home_dir, "Plots", "Reference_Period_Analysis", "no_sund_BC")
+
 add_scenario_horizon_grouping_columns(knmi_meteo_rast_dt)
 
 dt_dataset <- knmi_meteo_rast_dt

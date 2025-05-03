@@ -48,7 +48,7 @@ compute_seasonality <- function(dt, group_cols, value_cols, stat = "mean", q_bot
 }
 
 # Function to plot the statistics
-plot_seasonality_ts <- function(dt, bsn, info_col, color_col, value_col, stat, info_text, q_bot = 0.10, q_top = 0.90, show_ensemble = FALSE, show_range = FALSE, gof_pairs = NULL) {
+plot_seasonality_ts <- function(dt, plot_dir, bsn, info_col, color_col, value_col, stat, info_text, q_bot = 0.10, q_top = 0.90, show_ensemble = FALSE, show_range = FALSE, gof_pairs = NULL) {
   
   value_name <- plot_info$column_info$names[[info_col]]
   value_unit <- plot_info$column_info$units[[info_col]]
@@ -112,7 +112,7 @@ plot_seasonality_ts <- function(dt, bsn, info_col, color_col, value_col, stat, i
       values = plot_info[[color_col]]$colors,
       labels = plot_info[[color_col]]$labels
     ) +
-    ylim(0.2, 0.55) +
+    ylim(0.2, 0.7) +
     (if (show_range) scale_fill_manual(
       values = plot_info[[color_col]]$colors,
       labels = plot_info[[color_col]]$labels
@@ -120,13 +120,13 @@ plot_seasonality_ts <- function(dt, bsn, info_col, color_col, value_col, stat, i
     
 
   # Save the plot
-  save_dir <- file.path(here::here(), "Plots", "Reference_Period_Analysis", "bias_correction", "seasonality", info_col)
+  save_dir <- file.path(plot_dir, "seasonality", info_col)
   filename <- paste0("seasonality_ts_", bsn, "_", stat, "_", value_col, ifelse(show_ensemble,"ens", ""), ifelse(show_range, paste0("_Q", q_bot*100, "_Q", q_top*100), ""), info_text, ".pdf")
   save_plot(p, save_dir, filename, width = 18, height = 6)
   
 }
 
-plot_seasonality_bars <- function(dt, bsn, info_col, color_col, value_col, stat, info_text) {
+plot_seasonality_bars <- function(dt, plot_dir, bsn, info_col, color_col, value_col, stat, info_text) {
   
   value_name <- plot_info$column_info$names[[info_col]]
   value_unit <- plot_info$column_info$units[[info_col]]
@@ -161,7 +161,7 @@ plot_seasonality_bars <- function(dt, bsn, info_col, color_col, value_col, stat,
     )
   
   # Save the plot
-  save_dir <- file.path(here::here(), "Plots", "Reference_Period_Analysis", "bias_correction", "seasonality", info_col)
+  save_dir <- file.path(plot_dir, "seasonality", info_col)
   filename <- paste0("seasonality_bar_", bsn, "_", stat, "_", value_col, info_text, ".pdf")
   save_plot(p, save_dir, filename, width = 14, height = 6)
 }

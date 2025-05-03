@@ -37,114 +37,55 @@ plot_info <- list(
       "PREVAH" = "green",
       "wflow_sbm" = "blue",
       "larsim" = "red",
-      "observed" = "black"
+      "observation" = "black"
     ),
     labels = c(
       "PREVAH" = "PREVAH",
       "wflow_sbm" = "wflow_sbm",
       "larsim" = "larsim",
-      "observed" = "observed"
+      "observation" = "Observation"
     )
   ),
   scenario = list(
     colors = c(
-      "O" = "black",      
-      "C" = "grey40",     
-      "R" = "grey70",
       "L" = "blue",       
       "M" = "green",      
       "H" = "red",
       "none" = "grey50"
     ),
     labels = c(
-      "O" = "Observed", 
-      "C" = "Hindcast",  
-      "R" = "KNMI Ref",
-      "L" = "KNMI L",
-      "M" = "KNMI M",
-      "H" = "KNMI H",
-      "none" = "None"
+      "L" = "L",
+      "M" = "M",
+      "H" = "H",
+      "none" = "none"
     )
   ),
   scen_var = list(
     colors = c(
-      "Onone" = "black",      
-      "Cnone" = "grey40",     
-      "Rnone" = "grey70",
-      "Lnone" = "lightblue",
-      "Ld" = "lightblue",     
-      "Ln" = "blue",          
-      "Md" = "lightgreen",    
-      "Mn" = "green",         
-      "Hd" = "lightcoral",    
-      "Hn" = "red",
-      
-      # discharge all
-      "obs_none" = "black",      
-      "contr_none" = "grey40",     
-      "none_none" = "grey70",
       "L_none" = "lightblue",
       "L_dry" = "lightblue",     
       "L_wet" = "blue",          
       "M_dry" = "lightgreen",    
       "M_wet" = "green",         
       "H_dry" = "lightcoral",    
-      "H_wet" = "red"
+      "H_wet" = "red",
+      "none_none" = "grey50"
     ),
     labels = c(
-      "Onone" = "Observed", 
-      "Cnone" = "Hindcast",  
-      "Rnone" = "KNMI Ref",
-      "Lnone" = "KNMI L",
-      "Ld" = "KNMI Ld",   
-      "Ln" = "KNMI Ln",   
-      "Md" = "KNMI Md",   
-      "Mn" = "KNMI Mn",   
-      "Hd" = "KNMI Hd",   
-      "Hn" = "KNMI Hn",
-      
-      # discharge all
-      "obs_none" = "Observed",
-      "contr_none" = "Hindcast",
-      "none_none" = "KNMI ref",
-      "L_none" = "KNMI L",
-      "L_dry" = "KNMI L (Dry)",
-      "L_wet" = "KNMI L (Wet)",
-      "M_dry" = "KNMI M (Dry)",
-      "M_wet" = "KNMI M (Wet)",
-      "H_dry" = "KNMI H (Dry)",
-      "H_wet" = "KNMI H (Wet)"
+      "L_none" = "L",
+      "L_dry" = "L dry",
+      "L_wet" = "L wet",
+      "M_dry" = "M dry",
+      "M_wet" = "M wet",
+      "H_dry" = "H dry",
+      "H_wet" = "H wet",
+      "none_none" = "none"
     )
   ),
   scen_var_hor = list(
     colors = c(
-      "Onone_2005" = "black",      
-      "Cnone_2005" = "grey40",     
-      "Rnone_2005" = "grey70",
-      
-      "Lnone_2033" = "lightblue", 
-      "Ld_2100" = "dodgerblue3",    # Darker blue for 2100
-      "Ln_2100" = "deepskyblue",    # Keeping `Ln` as a slightly lighter blue
-      
-      "Md_2050" = "lightgreen",    
-      "Md_2100" = "forestgreen",    # Darker green for 2100
-      "Md_2150" = "darkgreen",  # Even darker green for 2150
-      
-      "Mn_2050" = "mediumseagreen",         
-      "Mn_2100" = "seagreen",  # Slightly darker green for 2100
-      "Mn_2150" = "darkseagreen",         
-      
-      "Hd_2050" = "lightcoral",    # Light coral for 2050
-      "Hd_2100" = "firebrick",     # Darker red for 2100
-      "Hd_2150" = "darkred",       # Darkest red for 2150
-      
-      "Hn_2050" = "lightpink",     # Light pink for 2050
-      "Hn_2100" = "pink",          # Slightly darker pink for 2100
-      "Hn_2150" = "hotpink",        # Darkest pink for 2150
-      
-      # discharge all
-      "obs_none_ref" = "black",
-      "none_none_hindcast" = "grey40",
+      "none_none_observation" = "black",      
+      "none_none_hindcast" = "grey40",     
       "none_none_ref" = "grey70",
       
       "L_none_2033" = "lightblue",
@@ -168,27 +109,7 @@ plot_info <- list(
       "H_wet_2150" = "hotpink"        # Darkest pink for 2150
     ),
     labels = c(
-      "Onone_2005" = "Observed", 
-      "Cnone_2005" = "Hindcast", 
-      "Rnone_2005" = "KNMI Ref", 
-      "Lnone_2033" = "KNMI L (2033)", 
-      "Ld_2100" = "KNMI Ld (2100)",  
-      "Ln_2100" = "KNMI Ln (2100)",  
-      "Md_2050" = "KNMI Md (2050)",  
-      "Md_2100" = "KNMI Md (2100)",  
-      "Md_2150" = "KNMI Md (2150)",  
-      "Mn_2050" = "KNMI Mn (2050)",  
-      "Mn_2100" = "KNMI Mn (2100)",  
-      "Mn_2150" = "KNMI Mn (2150)",  
-      "Hd_2050" = "KNMI Hd (2050)",  
-      "Hd_2100" = "KNMI Hd (2100)",  
-      "Hd_2150" = "KNMI Hd (2150)",  
-      "Hn_2050" = "KNMI Hn (2050)",  
-      "Hn_2100" = "KNMI Hn (2100)",  
-      "Hn_2150" = "KNMI Hn (2150)",
-      
-      # discharge all
-      "obs_none_ref" = "Observed",
+      "none_none_observation" = "Observation",
       "none_none_hindcast" = "Hindcast",
       "none_none_ref" = "KNMI ref",
       "L_none_2033" = "L 2033",
@@ -267,6 +188,11 @@ plot_info <- list(
       "sund_avg" = "sunshine duration (avg)",
       "sund_std" = "sunshine duration (std)",
       
+      "sdbc_min" = "sunshine duration (min) bc",
+      "sdbc_max" = "sunshine duration (max) bc",
+      "sdbc_avg" = "sunshine duration (avg) bc",
+      "sdbc_std" = "sunshine duration (std) bc",
+      
       "rhum_min" = "relative humidity (min)",
       "rhum_max" = "relative humidity (max)",
       "rhum_avg" = "relative humidity (avg)",
@@ -338,6 +264,11 @@ plot_info <- list(
       "sund_max" = "hours/d",
       "sund_avg" = "hours/d",
       "sund_std" = "hours/d",
+      
+      "sdbc_min" = "hours/d",
+      "sdbc_max" = "hours/d",
+      "sdbc_avg" = "hours/d",
+      "sdbc_std" = "hours/d",
       
       "rhum_min" = "%",
       "rhum_max" = "%",

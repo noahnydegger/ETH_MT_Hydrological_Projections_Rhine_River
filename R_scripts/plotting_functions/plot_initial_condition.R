@@ -1,7 +1,7 @@
 
 source(here("R_scripts", "plotting_functions", "knmi_plot_metadata.R"))
 
-plot_one_day_values <- function(dt, bsn, color_col, value_col, group_cols, date_col, target_day) {
+plot_one_day_values <- function(dt, plot_dir, bsn, color_col, value_col, group_cols, date_col, target_day) {
   
   value_name <- plot_info$column_info$names[[value_col]]
   value_unit <- plot_info$column_info$units[[value_col]]
@@ -43,7 +43,7 @@ plot_one_day_values <- function(dt, bsn, color_col, value_col, group_cols, date_
     )
   
   # Save the plot
-  save_dir <- file.path(here::here(), "Plots", "Reference_Period_Analysis", "Initial_Condition", value_col)
+  save_dir <- file.path(plot_dir, "Initial_Condition", value_col)
   filename <- paste0("ic_", bsn, "_", value_col, ".pdf")
   save_plot(p, save_dir, filename, width = 12, height = 6)
 }

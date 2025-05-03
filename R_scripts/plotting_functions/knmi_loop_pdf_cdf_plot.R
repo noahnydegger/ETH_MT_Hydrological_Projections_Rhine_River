@@ -1,4 +1,8 @@
 
+home_dir <-file.path(here::here())
+
+plot_dir <- file.path(home_dir, "Plots", "Reference_Period_Analysis", "no_sund_BC")
+
 dataset <- "mit_output" # or meteo_stat
 
 show_range <- FALSE
@@ -47,8 +51,8 @@ for (bsn in basins) {
     if (all(is.na(dt[[value_col]]))) next
     cat("Plotting pdf, cdf for", bsn, value_col, "\n")
     
-    plot_pdf(dt, bsn, color_col, value_col, group_cols)
-    plot_cdf(dt, bsn, color_col, value_col, group_cols)
+    plot_pdf(dt, plot_dir, bsn, color_col, value_col, group_cols)
+    plot_cdf(dt, plot_dir, bsn, color_col, value_col, group_cols)
   } # column loop
 } # basin loop
 

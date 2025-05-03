@@ -1,43 +1,47 @@
 #!/bin/bash
 
-# Define the remote and local directories
-REMOTE_DIR="nydegger@hyperion.wsl.ch:/home/nydegger/Rheinblick/R_KNMI"
-LOCAL_DIR="/Volumes/MT_case_sensitive/ETH_MT_Hydrological_Projections_Rhine_River/Data/Rheinblick2027/raw_prevah_output/R_KNMI"
+# === CONFIGURATION ===
+SCENARIO="Hd_2050"    # e.g., reference, rcp85
+ENSEMBLES=1 #$(seq 1 8)    # e.g., 1 2 3 4 or $(seq 1 8)
+EZG="ThS200"                  # Set to specific EZG (e.g., "Rhb200"), or leave empty to copy all
 
-# SSH into the remote server and find all matching folders
-folders=$(ssh nydegger@hyperion.wsl.ch "find /home/nydegger/Rheinblick/R_KNMI -mindepth 1 -maxdepth 1 -type d -name 'Hd_2150*'")
+REMOTE_USER="nydegger"
+REMOTE_HOST="hyperion.wsl.ch"
+REMOTE_BASE="/home/nydegger/Rheinblick/R_KNMI"
+LOCAL_BASE="/Volumes/MT_case_sensitive/ETH_MT_Hydrological_Projections_Rhine_River/Data/Rheinblick2027/raw_prevah_output/R_KNMI_with_glac"
 
-# Loop through each folder and copy its content
-for folder in $folders; do
-    # Extract the parent folder name and the folder name
-    parent_name=$(basename "$(dirname "$folder")")
-    # Extract the folder name (e.g., reference_ens1, reference_ens2)
-    folder_name=$(basename "$folder")
-    
-    # Define the corresponding local folder
-    local_folder="$LOCAL_DIR/$folder_name"
+# === MAIN LOOP ===
+for ENS in $ENSEMBLES; do
+    ENS_NAME="${SCENARIO}_ens${ENS}"
+    REMOTE_ENS_DIR="${REMOTE_BASE}/${ENS_NAME}"
+    LOCAL_ENS_DIR="${LOCAL_BASE}/${ENS_NAME}"
 
-    # Delete the local folder if it exists
-    if [ -d "$local_folder" ]; then
-        echo "Deleting existing folder: $local_folder"
-        rm -rf "$local_folder"
+    echo "[INFO] Syncing $ENS_NAME..."
+
+    if [ -n "$EZG" ]; then
+        REMOTE_PATH="${REMOTE_ENS_DIR}/${EZG}/"
+        LOCAL_PATH="${LOCAL_ENS_DIR}/${EZG}/"
+        mkdir -p "$LOCAL_PATH"
+        rsync -avz \
+            --include='*/' \
+            --include='*.mit' \
+            --include='*.stats' \
+            --include='*.pri' \
+            --exclude='*' \
+            "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_PATH}" "$LOCAL_PATH"
+    else
+        rsync -avz \
+            --include='*/' \
+            --include='*.mit' \
+            --include='*.stats' \
+            --include='*.pri' \
+            --exclude='*' \
+            "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_ENS_DIR}/" "$LOCAL_ENS_DIR/"
     fi
 
-    mkdir -p "$(dirname "$local_folder")"
-
-    # Copy content from remote to local
-    rsync -avz \
-        --include='*/' \
-        --include='*.mit' \
-        --include='*.stats' \
-        --include='*.pri' \
-        --exclude='*' \
-        "nydegger@hyperion.wsl.ch:$folder/" "$local_folder/"
-
-    # Check if the command was successful
     if [ $? -eq 0 ]; then
-        echo "Successfully copied: $folder -> $local_folder"
+        echo "Successfully copied: $ENS_NAME"
     else
-        echo "Error occurred copying: $folder"
+        echo "Error copying: $ENS_NAME"
     fi
 done

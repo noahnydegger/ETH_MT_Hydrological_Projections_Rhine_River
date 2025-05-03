@@ -4,9 +4,11 @@ library(data.table)
 # project directory
 home_dir <- file.path(here::here())
 
+run_type <- "no_sund_bc"
+
 # input directories
-input_dir_knmi <- file.path(home_dir, "Data", "Rheinblick2027", "raw_prevah_output", "R_KNMI")
-input_dir_hind <- file.path(home_dir, "Data", "Rheinblick2027", "raw_prevah_output", "R_KNMI", "hindcast", "CTRL_RUN_WSL_F_2021_g73")
+input_dir_knmi <- file.path(home_dir, "Data", "Rheinblick2027", "raw_prevah_output", paste0("R_KNMI", "_", run_type))
+input_dir_hind <- file.path(home_dir, "Data", "Rheinblick2027", "raw_prevah_output", paste0("R_KNMI", "_", run_type), "hindcast", "CTRL_RUN_WSL_F_2021_g73")
 
 # output directory
 output_dir <- file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output")
@@ -27,7 +29,7 @@ all_scenario_horizons <- c(
 )
 
 scenario_horizons <- c(
-  "L_2033", "Md_2100", "Ld_2100", "Ln_2100", "Hd_2150"
+  "L_2033"
 )
 
 read_hindcast <- FALSE
@@ -35,11 +37,11 @@ read_hindcast <- FALSE
 ensembles <- paste0("ens", 1:8)
 
 meteo_variables_knmi <- c(
-  "tair", "prec", "radg", "sund", "rhum", "wspd"
+  "tair", "prec", "radg", "sund", "rhum", "wspd", "sdbc"
 )
 
 meteo_variables_hind <- c(
-  "temp", "prec", "rad_", "ssd_", "relh", "wind"
+  "temp", "prec", "rad_", "ssd_", "relh", "wind", "sdbc"
 )
 
 no_meteo_gebiete <- c(
@@ -67,7 +69,7 @@ read_raw_data <- function(file_path) {
   return(raw_data)
 }
 
-process_mit_data <- function(data_file, horizon, scenario, variant, member, ezg) {
+process_mit_data <- function(data_file, horizon, scenario, variant, member, ezg, run_type) {
   # Check if the file exists before reading
   if (file.exists(data_file)) {
     
@@ -82,7 +84,8 @@ process_mit_data <- function(data_file, horizon, scenario, variant, member, ezg)
       member = member,
       hydro_model = "PREVAH",
       source = "WSL",
-      basin = ezg
+      basin = ezg,
+      run_type = run_type
     )]
     
     mit_data <- add_scenario_horizon_grouping_columns(mit_data)
@@ -91,7 +94,7 @@ process_mit_data <- function(data_file, horizon, scenario, variant, member, ezg)
     prevah_date_cols <- c("YYYY", "MM", "DD")
     prevah_general_cols <- c("basin")
     rblick_date_cols <- c("date")
-    rblick_cols <- c("horizon", "scenario", "variant", "member", "scen_var", "scen_var_hor", "period", "hydro_model", "source")
+    rblick_cols <- c("horizon", "scenario", "variant", "member", "scen_var", "scen_var_hor", "period", "run_type", "hydro_model", "source")
     
     non_value_col <- c(prevah_date_cols, prevah_general_cols, rblick_date_cols, rblick_cols)
     
@@ -110,7 +113,7 @@ process_mit_data <- function(data_file, horizon, scenario, variant, member, ezg)
   }
 }
 
-process_meteo_stats_data <- function(ezg_dir, meteo_variables, meteo_stat_file_suffix, horizon, scenario, variant, member, ezg) {
+process_meteo_stats_data <- function(ezg_dir, meteo_variables, meteo_stat_file_suffix, horizon, scenario, variant, member, ezg, run_type) {
   
   # Initialize an empty data.table to store combined meteo data
   all_meteo_data_dt <- data.table()
@@ -139,7 +142,8 @@ process_meteo_stats_data <- function(ezg_dir, meteo_variables, meteo_stat_file_s
         member = member,
         hydro_model = "PREVAH",
         source = "WSL",
-        basin = ezg
+        basin = ezg,
+        run_type = run_type
       )]
       
       # Merge only meteo columns on "date"
@@ -154,7 +158,7 @@ process_meteo_stats_data <- function(ezg_dir, meteo_variables, meteo_stat_file_s
         )
       }
     } else {
-      stop(paste("File not found:", meteo_file))
+      warning(paste("File not found:", meteo_file))
     }
   } # meteo_variables loop
   
@@ -164,7 +168,7 @@ process_meteo_stats_data <- function(ezg_dir, meteo_variables, meteo_stat_file_s
   prevah_date_cols <- c("YYYY", "MM", "DD")
   prevah_general_cols <- c("basin")
   rblick_date_cols <- c("date")
-  rblick_cols <- c("horizon", "scenario", "variant", "member", "scen_var", "scen_var_hor", "period", "hydro_model", "source")
+  rblick_cols <- c("horizon", "scenario", "variant", "member", "scen_var", "scen_var_hor", "period", "run_type", "hydro_model", "source")
   
   non_value_col <- c(prevah_date_cols, prevah_general_cols, rblick_date_cols, rblick_cols)
   
@@ -244,7 +248,7 @@ change_row_entries <- function(dt, column, row_value_map) {
   return(dt)
 }
 
-export_to_rds_csv <- function(dt, output_dir, source_folder, scen_hor) {
+export_to_rds_csv <- function(dt, output_dir, source_folder, scen_hor, run_type) {
   
   output_dir <- file.path(output_dir, source_folder)
   
@@ -252,10 +256,10 @@ export_to_rds_csv <- function(dt, output_dir, source_folder, scen_hor) {
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
   
   # Export to .RDS format
-  saveRDS(dt, file.path(output_dir, paste0(scen_hor, "_", source_folder, ".rds")))
+  saveRDS(dt, file.path(output_dir, paste0(scen_hor, "_", source_folder, "_", run_type, ".rds")))
   
   # Export to CSV
-  write.csv2(dt, file.path(output_dir, paste0(scen_hor, "_", source_folder, ".csv")), row.names = FALSE, quote = FALSE)
+  write.csv2(dt, file.path(output_dir, paste0(scen_hor, "_", source_folder, "_", run_type, ".csv")), row.names = FALSE, quote = FALSE)
   
   cat(scen_hor, source_folder ,"exported", "\n")
 }
@@ -317,7 +321,7 @@ for (scen in scenario_horizons) {
       # First process .mit files
       mit_file <- file.path(ezg_dir, paste0(ezg, mit_output_file_suffix))
       
-      mit_data <- process_mit_data(mit_file, horizon, scenario, variant, member, ezg)
+      mit_data <- process_mit_data(mit_file, horizon, scenario, variant, member, ezg, run_type)
       
       # Append this to the list of all mit data
       all_mit_data_list[[length(all_mit_data_list) + 1]] <- mit_data
@@ -325,7 +329,7 @@ for (scen in scenario_horizons) {
       
       if (!(ezg %in% no_meteo_gebiete)) {
         # Process meteo statistics data
-        all_meteo_data_dt <- process_meteo_stats_data(ezg_dir, meteo_variables_knmi, meteo_stat_file_suffix_knmi, horizon, scenario, variant, member, ezg)
+        all_meteo_data_dt <- process_meteo_stats_data(ezg_dir, meteo_variables_knmi, meteo_stat_file_suffix_knmi, horizon, scenario, variant, member, ezg, run_type)
         
         all_meteo_data_list[[length(all_meteo_data_list) + 1]] <- all_meteo_data_dt
         scenario_meteo_stat_list[[length(scenario_meteo_stat_list) + 1]] <- all_meteo_data_dt
@@ -340,13 +344,15 @@ for (scen in scenario_horizons) {
     rbindlist(scenario_mit_output_list), 
     output_dir, 
     "mit_output", 
-    scen
+    scen,
+    run_type
   )
   export_to_rds_csv(
     rbindlist(scenario_meteo_stat_list), 
     output_dir, 
     "meteo_stat", 
-    scen
+    scen,
+    run_type
   )
 } # scenario_horizons loop
 
@@ -369,14 +375,14 @@ if (read_hindcast) {
     # First process .mit files
     mit_file <- file.path(ezg_dir, paste0(ezg, mit_output_file_suffix))
     
-    mit_data <- process_mit_data(mit_file, horizon, scenario, variant, member, ezg)
+    mit_data <- process_mit_data(mit_file, horizon, scenario, variant, member, ezg, run_type)
     
     # Append this to the list of all mit data
     all_mit_data_list[[length(all_mit_data_list) + 1]] <- mit_data
     
     if (!(ezg %in% no_meteo_gebiete)) {
       # Process meteo statistics data
-      all_meteo_data_dt <- process_meteo_stats_data(ezg_dir, meteo_variables_hind, meteo_stat_file_suffix_hind, horizon, scenario, variant, member, ezg)
+      all_meteo_data_dt <- process_meteo_stats_data(ezg_dir, meteo_variables_hind, meteo_stat_file_suffix_hind, horizon, scenario, variant, member, ezg, run_type)
       
       # Create a named vector for mapping
       replacement_map <- setNames(meteo_variables_knmi, meteo_variables_hind)
@@ -403,13 +409,15 @@ if (read_hindcast) {
     mit_data, 
     output_dir, 
     "mit_output", 
-    "hindcast"
+    "hindcast",
+    run_type
   )
   export_to_rds_csv(
     all_meteo_data_dt, 
     output_dir, 
     "meteo_stat", 
-    "hindcast"
+    "hindcast",
+    run_type
   )
 }
 

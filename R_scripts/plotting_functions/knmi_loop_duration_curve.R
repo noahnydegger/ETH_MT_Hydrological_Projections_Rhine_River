@@ -1,4 +1,8 @@
 
+home_dir <-file.path(here::here())
+
+plot_dir <- file.path(home_dir, "Plots", "Reference_Period_Analysis", "no_sund_BC")
+
 dataset <- "mit_output"
 
 show_range <- FALSE
@@ -46,7 +50,7 @@ for (bsn in basins) {
     if (all(is.na(dt[[value_col]]))) next
     cat("Plotting duration curve for", bsn, value_col, "\n")
     
-    plot_fdc(dt, bsn, color_col, value_col, group_cols)
+    plot_fdc(dt, plot_dir, bsn, color_col, value_col, group_cols)
   } # column loop
 } # basin loop
 

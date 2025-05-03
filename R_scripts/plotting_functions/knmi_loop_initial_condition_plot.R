@@ -1,4 +1,8 @@
 
+home_dir <-file.path(here::here())
+
+plot_dir <- file.path(home_dir, "Plots", "Reference_Period_Analysis", "no_sund_BC")
+
 dataset <- "mit_output"
 
 show_range <- FALSE
@@ -39,7 +43,7 @@ for (bsn in basins) {
     if (all(is.na(dt[[value_col]]))) next
     cat("Plotting one day values for", bsn, value_col, "\n")
     
-    plot_one_day_values(dt, bsn, color_col, value_col, group_cols, date_col, sel_day)
+    plot_one_day_values(dt, plot_dir, bsn, color_col, value_col, group_cols, date_col, sel_day)
   } # column loop
 } # basin loop
 

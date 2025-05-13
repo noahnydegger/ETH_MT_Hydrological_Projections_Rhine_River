@@ -1,14 +1,16 @@
 #!/bin/bash
 
 # === CONFIGURATION ===
-SCENARIO="Hd_2050"    # e.g., reference, rcp85
+SCENARIO="Ln_2100"    # e.g., reference, rcp85
 ENSEMBLES=1 #$(seq 1 8)    # e.g., 1 2 3 4 or $(seq 1 8)
-EZG="ThS200"                  # Set to specific EZG (e.g., "Rhb200"), or leave empty to copy all
+EZG="ThS200"               # Set to specific EZG (e.g., "Rhb200"), or leave empty to copy all
+
+RUN_TYPE="with_glac_sdbc" 
 
 REMOTE_USER="nydegger"
 REMOTE_HOST="hyperion.wsl.ch"
 REMOTE_BASE="/home/nydegger/Rheinblick/R_KNMI"
-LOCAL_BASE="/Volumes/MT_case_sensitive/ETH_MT_Hydrological_Projections_Rhine_River/Data/Rheinblick2027/raw_prevah_output/R_KNMI_with_glac"
+LOCAL_BASE="/Volumes/MT_case_sensitive/ETH_MT_Hydrological_Projections_Rhine_River/Data/Rheinblick2027/raw_prevah_output/R_KNMI_${RUN_TYPE}"
 
 # === MAIN LOOP ===
 for ENS in $ENSEMBLES; do

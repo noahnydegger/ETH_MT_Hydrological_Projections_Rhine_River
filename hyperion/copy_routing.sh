@@ -1,33 +1,51 @@
 #!/bin/bash
 
-# Define the remote and local directories
-REMOTE_DIR="nydegger@hyperion.wsl.ch:/home/nydegger/Rheinblick/routing/Thu200"
-LOCAL_DIR="/Volumes/MT_case_sensitive/ETH_MT_Hydrological_Projections_Rhine_River/Data/Rheinblick2027/raw_prevah_output/routing/Thu200"
+# === CONFIGURATION ===
+SCENARIO="reference"        # e.g., reference, rcp85
+ENSEMBLES=$(seq 1 8)        # e.g., 1 2 3 4
+EZG=""                      # Set to e.g. "NoW200", or leave empty to copy all
 
-# SSH into the remote server and find all subfolders
-folders=$(ssh nydegger@hyperion.wsl.ch "find /home/nydegger/Rheinblick/routing/Thu200 -mindepth 1 -maxdepth 1 -type d")
+RUN_TYPE="sund_bc"
 
-# Loop through each folder and copy its content
-for folder in $folders; do
-    # Extract the folder name (e.g., folder1, folder2)
-    folder_name=$(basename "$folder")
-    
-    # Define the corresponding local folder
-    local_folder="$LOCAL_DIR/$folder_name"
+REMOTE_USER="nydegger"
+REMOTE_HOST="hyperion.wsl.ch"
+REMOTE_BASE="/home/nydegger/Rheinblick/routing"
+LOCAL_BASE="/Volumes/MT_case_sensitive/ETH_MT_Hydrological_Projections_Rhine_River/Data/Rheinblick2027/raw_prevah_output/routing_${RUN_TYPE}"
 
-    # Delete the local folder if it exists
-    if [ -d "$local_folder" ]; then
-        echo "Deleting existing folder: $local_folder"
-        rm -rf "$local_folder"
-    fi
+# === MAIN LOOP ===
+for ENS in $ENSEMBLES; do
+    ENS_NAME="${SCENARIO}_ens${ENS}"
 
-    # Copy content from remote to local
-    rsync -avz "nydegger@hyperion.wsl.ch:$folder/" "$local_folder/"
+    if [ -n "$EZG" ]; then
+        REMOTE_PATH="${REMOTE_BASE}/${EZG}/${ENS_NAME}/"
+        LOCAL_PATH="${LOCAL_BASE}/${EZG}/${ENS_NAME}/"
 
-    # Check if the command was successful
-    if [ $? -eq 0 ]; then
-        echo "Successfully copied: $folder -> $local_folder"
+        echo "[INFO] Copying $ENS_NAME from EZG: $EZG"
+        mkdir -p "$LOCAL_PATH"
+
+        rsync -avz \
+            --include='*.dat' \
+            --exclude='*' \
+            "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_PATH}" "$LOCAL_PATH"
+
+        [[ $? -eq 0 ]] && echo "[INFO] Success: $ENS_NAME" || echo "[ERROR] Failed: $ENS_NAME"
     else
-        echo "Error occurred copying: $folder"
+        echo "[INFO] Searching for $ENS_NAME in all EZGs..."
+        EZG_LIST=$(ssh ${REMOTE_USER}@${REMOTE_HOST} "find ${REMOTE_BASE} -type d -name ${ENS_NAME} -printf '%h\n' | xargs -n1 basename | sort -u")
+
+        for CURRENT_EZG in $EZG_LIST; do
+            REMOTE_PATH="${REMOTE_BASE}/${CURRENT_EZG}/${ENS_NAME}/"
+            LOCAL_PATH="${LOCAL_BASE}/${CURRENT_EZG}/${ENS_NAME}/"
+
+            echo "[INFO] Copying $ENS_NAME from EZG: $CURRENT_EZG"
+            mkdir -p "$LOCAL_PATH"
+
+            rsync -avz \
+                --include='*.dat' \
+                --exclude='*' \
+                "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_PATH}" "$LOCAL_PATH"
+
+            [[ $? -eq 0 ]] && echo "[INFO] Success: $ENS_NAME in $CURRENT_EZG" || echo "[ERROR] Failed: $ENS_NAME in $CURRENT_EZG"
+        done
     fi
 done

@@ -4,11 +4,11 @@ library(data.table)
 # project directory
 home_dir <- file.path(here::here())
 
-run_type <- "no_sund_bc"
+run_type <- "with_glac_sdbc"
 
 # input directories
 input_dir_knmi <- file.path(home_dir, "Data", "Rheinblick2027", "raw_prevah_output", paste0("R_KNMI", "_", run_type))
-input_dir_hind <- file.path(home_dir, "Data", "Rheinblick2027", "raw_prevah_output", paste0("R_KNMI", "_", run_type), "hindcast", "CTRL_RUN_WSL_F_2021_g73")
+input_dir_hind <- file.path(home_dir, "Data", "Rheinblick2027", "raw_prevah_output", "R_KNMI_hindcast", "CTRL_RUN_WSL_F_2021_g73")
 
 # output directory
 output_dir <- file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output")
@@ -21,17 +21,20 @@ output_name_mit_output <- "prevah_mit_output_knmi"
 output_name_meteo_stat <- "prevah_meteo_stat_knmi"
 
 all_scenario_horizons <- c(
-  "reference", 
+  "Hd_2050", "Hd_2100", "Hd_2150",
+  "Hn_2050", "Hn_2100", "Hn_2150",
+  "Md_2050", "Md_2100", "Md_2150",
+  "Mn_2050", "Mn_2100", "Mn_2150",
+  "Ld_2100", "Ln_2100",
   "L_2033",
-  "Md_2050", "Mn_2050", "Hd_2050", "Hn_2050",
-  "Md_2100", "Mn_2100", "Hd_2100", "Hn_2100", "Ld_2100", "Ln_2100",
-  "Md_2150", "Mn_2150", "Hd_2150", "Hn_2150"
+  "reference"
 )
 
 scenario_horizons <- c(
-  "L_2033"
+  "Hd_2050", "Hd_2100", "Hd_2150",
+  "Ld_2100", "Ln_2100",
+  "Md_2150"
 )
-
 read_hindcast <- FALSE
 
 ensembles <- paste0("ens", 1:8)
@@ -128,6 +131,9 @@ process_meteo_stats_data <- function(ezg_dir, meteo_variables, meteo_stat_file_s
       
       # Import data from the .stats file
       meteo_data <- read_raw_data(meteo_file)
+      
+      # If var is 'sdbc', rename it to 'sund'
+      if (var == "sdbc") var <- "sund"
       
       # Rename meteo-specific columns with 'var_' prefix
       old_meteo_cols <- c("MIN", "MAX", "AVG", "STDEV")
@@ -250,16 +256,20 @@ change_row_entries <- function(dt, column, row_value_map) {
 
 export_to_rds_csv <- function(dt, output_dir, source_folder, scen_hor, run_type) {
   
-  output_dir <- file.path(output_dir, source_folder)
+  output_dir <- file.path(output_dir, source_folder, run_type)
   
   # Ensure the output directory exists
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
   
-  # Export to .RDS format
-  saveRDS(dt, file.path(output_dir, paste0(scen_hor, "_", source_folder, "_", run_type, ".rds")))
+  # Define file paths
+  rds_path <- file.path(output_dir, paste0(scen_hor, "_", source_folder, "_", run_type, ".rds"))
+  csv_path <- file.path(output_dir, paste0(scen_hor, "_", source_folder, "_", run_type, ".csv"))
   
-  # Export to CSV
-  write.csv2(dt, file.path(output_dir, paste0(scen_hor, "_", source_folder, "_", run_type, ".csv")), row.names = FALSE, quote = FALSE)
+  # Export to .RDS format
+  saveRDS(dt, rds_path)
+  
+  # Export to CSV using fwrite with comma separator
+  fwrite(dt, csv_path)
   
   cat(scen_hor, source_folder ,"exported", "\n")
 }
@@ -363,6 +373,10 @@ if (read_hindcast) {
   scenario <- "none" # for control run
   variant <- "none"
   member <- "none"
+  run_type_hind <- "hindcast"
+  
+  hind_mit_output_list <- list()
+  hind_meteo_stat_list <- list()
   
   # List all subfolders (gebiete) in the matched scenario-ensemble folder
   gebiete_folders <- list.dirs(input_dir_hind, recursive = FALSE)
@@ -375,14 +389,15 @@ if (read_hindcast) {
     # First process .mit files
     mit_file <- file.path(ezg_dir, paste0(ezg, mit_output_file_suffix))
     
-    mit_data <- process_mit_data(mit_file, horizon, scenario, variant, member, ezg, run_type)
+    mit_data <- process_mit_data(mit_file, horizon, scenario, variant, member, ezg, run_type_hind)
     
     # Append this to the list of all mit data
     all_mit_data_list[[length(all_mit_data_list) + 1]] <- mit_data
+    hind_mit_output_list[[length(hind_mit_output_list) + 1]] <- mit_data
     
     if (!(ezg %in% no_meteo_gebiete)) {
       # Process meteo statistics data
-      all_meteo_data_dt <- process_meteo_stats_data(ezg_dir, meteo_variables_hind, meteo_stat_file_suffix_hind, horizon, scenario, variant, member, ezg, run_type)
+      all_meteo_data_dt <- process_meteo_stats_data(ezg_dir, meteo_variables_hind, meteo_stat_file_suffix_hind, horizon, scenario, variant, member, ezg, run_type_hind)
       
       # Create a named vector for mapping
       replacement_map <- setNames(meteo_variables_knmi, meteo_variables_hind)
@@ -394,30 +409,34 @@ if (read_hindcast) {
       )
       
       all_meteo_data_list[[length(all_meteo_data_list) + 1]] <- all_meteo_data_dt
+      hind_meteo_stat_list[[length(hind_meteo_stat_list) + 1]] <- all_meteo_data_dt
       
     } # no_meteo_gebiete check
   } # gebiete_folders loop
   
+  hind_mit_output_dt <- rbindlist(hind_mit_output_list)
+  hind_meteo_stat_dt <- rbindlist(hind_meteo_stat_list)
+  
   row_value_map <- c(  # old_value = new_value
     "Bod200" = "Bod400"
   )
-  mit_data <- change_row_entries(mit_data, "basin", row_value_map)
-  all_meteo_data_dt <- change_row_entries(all_meteo_data_dt, "basin", row_value_map)
+  hind_mit_output_dt <- change_row_entries(hind_mit_output_dt, "basin", row_value_map)
+  hind_meteo_stat_dt <- change_row_entries(hind_meteo_stat_dt, "basin", row_value_map)
   
   # add columns and export
   export_to_rds_csv(
-    mit_data, 
+    hind_mit_output_dt, 
     output_dir, 
     "mit_output", 
     "hindcast",
-    run_type
+    run_type_hind
   )
   export_to_rds_csv(
-    all_meteo_data_dt, 
+    hind_meteo_stat_dt, 
     output_dir, 
     "meteo_stat", 
     "hindcast",
-    run_type
+    run_type_hind
   )
 }
 

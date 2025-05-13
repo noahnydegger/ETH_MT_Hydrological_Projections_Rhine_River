@@ -33,10 +33,10 @@ plot_pdf <- function(dt, plot_dir, bsn, color_col, value_col, group_cols) {
 }
 
 # CDF Plot Function
-plot_cdf <- function(dt, plot_dir, bsn, info_col, color_col, value_col, group_cols) {
+plot_cdf <- function(dt, plot_dir, bsn, color_col, value_col, group_cols) {
   
-  value_name <- plot_info$column_info$names[[info_col]]
-  value_unit <- plot_info$column_info$units[[info_col]]
+  value_name <- plot_info$column_info$names[[value_col]]
+  value_unit <- plot_info$column_info$units[[value_col]]
   
   p <- ggplot(dt, aes(x = .data[[value_col]], color = .data[[color_col]])) +
     stat_ecdf(geom = "step") +  # Step plot for CDF

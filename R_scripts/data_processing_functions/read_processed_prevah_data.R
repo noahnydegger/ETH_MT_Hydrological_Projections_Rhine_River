@@ -11,8 +11,8 @@ knmi_variables <- list(
   knmi_meteo_stat_dt = list(read = FALSE, read_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "prevah_meteo_stat_knmi.rds"),
                             combine = FALSE, combine_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "meteo_stat")),
   
-  knmi_discharge_dt = list(read = FALSE, read_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "prevah_discharge_knmi.rds"),
-                           combine = TRUE, combine_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "discharge")),
+  knmi_discharge_dt = list(read = TRUE, read_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "prevah_discharge_knmi.rds"),
+                           combine = FALSE, combine_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "discharge")),
   
   knmi_discharge_dt_rblick = list(read = FALSE, read_dir = "path/to/discharge_data.rds")
 )
@@ -56,7 +56,7 @@ combine_rds_scenario_data <- function(var_list) {
     read_dir <- config$read_dir
     
     # Find all .rds files in the combine directory
-    rds_files <- list.files(combine_dir, pattern = "\\.rds$", full.names = TRUE)
+    rds_files <- list.files(combine_dir, pattern = "\\.rds$", full.names = TRUE, recursive = TRUE)
     if (length(rds_files) == 0) {
       warning("No .rds files found in ", combine_dir)
       next

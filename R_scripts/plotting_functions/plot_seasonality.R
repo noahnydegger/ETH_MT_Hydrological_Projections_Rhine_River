@@ -112,7 +112,7 @@ plot_seasonality_ts <- function(dt, plot_dir, bsn, info_col, color_col, value_co
       values = plot_info[[color_col]]$colors,
       labels = plot_info[[color_col]]$labels
     ) +
-    ylim(0.2, 0.7) +
+    #ylim(0.2, 0.7) +
     (if (show_range) scale_fill_manual(
       values = plot_info[[color_col]]$colors,
       labels = plot_info[[color_col]]$labels

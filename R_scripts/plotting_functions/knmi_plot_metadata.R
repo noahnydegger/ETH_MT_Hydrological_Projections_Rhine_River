@@ -129,6 +129,24 @@ plot_info <- list(
       "H_wet_2150" = "H wet 2150"
     )
   ),
+  run_type = list(
+    colors = c(
+      "observation" = "black",
+      "hindcast" = "grey40",
+      "no_sund_bc" = "darkred",
+      "sund_bc" = "orange",
+      "with_glac_sdbc" = "darkblue",
+      "with_glac_sund" = "lightblue"
+    ),
+    labels = c(
+      "observation" = "Observation",
+      "hindcast" = "Hindcast",
+      "no_sund_bc" = "without sund BC",
+      "sund_bc" = "with sund BC",
+      "with_glac_sdbc" = "with CH2018 glacier, with sund BC",
+      "with_glac_sund" = "with CH2018 glacier, no sund BC"
+    )
+  ),
   basin_info = list(
     names = c("Now200" = "Northwestern Switzerland",
               "ThS200" = "Thunersee", 

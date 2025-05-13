@@ -20,17 +20,30 @@ if (!exists("knmi_meteo_stat_dt", envir = .GlobalEnv)) {
 }
 
 # functions ----------------------------------------------------------------
-
-compute_delta_n_years <- function(values, years, start_year, end_year, n_years = 5) {
-  early_mean <- mean(values[years >= start_year & years < start_year + n_years], na.rm = TRUE)
-  late_mean  <- mean(values[years > end_year - n_years & years <= end_year], na.rm = TRUE)
+compute_delta_n_years <- function(values, years, months, start_year, end_year, n_years = 5, months_sel = NULL) {
+  
+  # Filter: early and late period + optional month selection
+  early_filter <- years >= start_year & years < start_year + n_years
+  late_filter  <- years > end_year - n_years & years <= end_year
+  
+  if (!is.null(months_sel)) {
+    early_filter <- early_filter & months %in% months_sel
+    late_filter  <- late_filter & months %in% months_sel
+  }
+  
+  early_mean <- mean(values[early_filter], na.rm = TRUE)
+  late_mean  <- mean(values[late_filter], na.rm = TRUE)
+  
   late_mean - early_mean
 }
 
 # compute KNMI mean tair_avg for each (scenario, variant, horizon) over 30-year periods
-horizon_summary_knmi <- function(knmi_dt, bsn = "ThS200") {
-  # Filter for specified basin
-  knmi_dt <- knmi_dt[basin == bsn]
+horizon_summary_knmi <- function(knmi_dt, bsn = "ThS200", 
+                                 tair_months = c(5, 6, 7, 10, 11), 
+                                 prec_months = c(10, 11, 12, 1, 2, 3, 4, 5, 6)) {
+  # Filter for specified basin and run_type
+  run_type_sel <- c("no_sund_bc")
+  knmi_dt <- knmi_dt[basin == bsn & run_type %in% run_type_sel]
   
   # Keep only rows where horizon is numeric
   knmi_dt <- knmi_dt[suppressWarnings(!is.na(as.numeric(horizon)))]
@@ -41,6 +54,7 @@ horizon_summary_knmi <- function(knmi_dt, bsn = "ThS200") {
   
   knmi_dt[, date := as.Date(date)]
   knmi_dt[, year := year(date)]
+  knmi_dt[, month := month(date)]
   
   # Calculate start and end years directly on knmi_dt
   knmi_dt[, start_year := horizon - 14]
@@ -60,26 +74,40 @@ horizon_summary_knmi <- function(knmi_dt, bsn = "ThS200") {
                            list(
                              start_year = start_y,
                              end_year = end_y,
-                             tair_avg_knmi = mean(tair_avg, na.rm = TRUE),
-                             radg_avg_knmi = mean(radg_avg, na.rm = TRUE),
-                             prec_avg_knmi = mean(prec_avg, na.rm = TRUE),
                              
-                             tair_trend_knmi = compute_delta_n_years(tair_avg, year, start_y, end_y, n_years),
-                             radg_trend_knmi = compute_delta_n_years(radg_avg, year, start_y, end_y, n_years),
-                             prec_trend_knmi = compute_delta_n_years(prec_avg, year, start_y, end_y, n_years)
+                             # Overall means
+                             tair_avg_year_knmi = mean(tair_avg, na.rm = TRUE),
+                             radg_avg_year_knmi = mean(radg_avg, na.rm = TRUE),
+                             prec_avg_year_knmi = mean(prec_avg, na.rm = TRUE),
+                             
+                             # Seasonal means
+                             tair_avg_seas_knmi = mean(tair_avg[month %in% tair_months], na.rm = TRUE), # tair: May, June, July, October, November
+                             prec_avg_seas_knmi = mean(prec_avg[month %in% prec_months], na.rm = TRUE), # prec: October, November, December, January, February, March, April, May, June
+                             
+                             # Overall trends
+                             tair_trend_year_knmi = compute_delta_n_years(tair_avg, year, month, start_y, end_y, n_years),
+                             radg_trend_year_knmi = compute_delta_n_years(radg_avg, year, month, start_y, end_y, n_years),
+                             prec_trend_year_knmi = compute_delta_n_years(prec_avg, year, month, start_y, end_y, n_years),
+                             
+                             # Seasonal trends
+                             tair_trend_seas_knmi = compute_delta_n_years(tair_avg, year, month, start_y, end_y, n_years, months_sel = tair_months),
+                             prec_trend_seas_knmi = compute_delta_n_years(prec_avg, year, month, start_y, end_y, n_years, months_sel = prec_months)
                            )
                          },
-                         by = .(basin, scenario, variant, member, horizon)
+                         by = .(basin, scenario, variant, member, horizon, run_type)
   ]
   
   return(knmi_avg_dt)
 }
 
 # Step 2: compute CH2018 mean tair_avg per chain for the same time spans as KNMI
-horizon_summary_ch2018 <- function(ch2018_dt, knmi_avg_dt, bsn = "ThS200") {
+horizon_summary_ch2018 <- function(ch2018_dt, knmi_avg_dt, bsn = "ThS200", 
+                                   tair_months = c(5, 6, 7, 10, 11), 
+                                   prec_months = c(10, 11, 12, 1, 2, 3, 4, 5, 6)) {
   ch2018_dt <- ch2018_dt[basin == bsn]
   ch2018_dt[, date := as.Date(date)]
   ch2018_dt[, year := year(date)]
+  ch2018_dt[, month := month(date)]
   
   # Get unique start–end year periods from KNMI
   periods <- unique(knmi_avg_dt[, .(horizon, start_year, end_year)])
@@ -97,13 +125,24 @@ horizon_summary_ch2018 <- function(ch2018_dt, knmi_avg_dt, bsn = "ThS200") {
                 horizon = hor,
                 start_year = sy,
                 end_year = ey,
-                tair_avg_ch2018 = mean(tair_avg, na.rm = TRUE),
-                radg_avg_ch2018 = mean(radg_avg, na.rm = TRUE),
-                prec_avg_ch2018 = mean(prec_avg, na.rm = TRUE),
                 
-                tair_trend_ch2018 = compute_delta_n_years(tair_avg, year, sy, ey, n_years),
-                radg_trend_ch2018 = compute_delta_n_years(radg_avg, year, sy, ey, n_years),
-                prec_trend_ch2018 = compute_delta_n_years(prec_avg, year, sy, ey, n_years)
+                # Overall means
+                tair_avg_year_ch2018 = mean(tair_avg, na.rm = TRUE),
+                radg_avg_year_ch2018 = mean(radg_avg, na.rm = TRUE),
+                prec_avg_year_ch2018 = mean(prec_avg, na.rm = TRUE),
+                
+                # Seasonal means
+                tair_avg_seas_ch2018 = mean(tair_avg[month %in% tair_months], na.rm = TRUE),
+                prec_avg_seas_ch2018 = mean(prec_avg[month %in% prec_months], na.rm = TRUE),
+                
+                # Overall trends
+                tair_trend_year_ch2018 = compute_delta_n_years(tair_avg, year, month, sy, ey, n_years),
+                radg_trend_year_ch2018 = compute_delta_n_years(radg_avg, year, month, sy, ey, n_years),
+                prec_trend_year_ch2018 = compute_delta_n_years(prec_avg, year, month, sy, ey, n_years),
+                
+                # Seasonal trends
+                tair_trend_seas_ch2018 = compute_delta_n_years(tair_avg, year, month, sy, ey, n_years, months_sel = tair_months),
+                prec_trend_seas_ch2018 = compute_delta_n_years(prec_avg, year, month, sy, ey, n_years, months_sel = prec_months)
               ),
               by = .(basin, chain, glchain)
     ]
@@ -129,8 +168,10 @@ combine_avg_data <- function(knmi_avg_dt, ch2018_avg_dt) {
     knmi_avg_dt,
     ch2018_avg_dt[, .(
       basin, horizon, chain, glchain,
-      tair_avg_ch2018, radg_avg_ch2018, prec_avg_ch2018,
-      tair_trend_ch2018, radg_trend_ch2018, prec_trend_ch2018,
+      tair_avg_year_ch2018, radg_avg_year_ch2018, prec_avg_year_ch2018,
+      tair_avg_seas_ch2018, prec_avg_seas_ch2018,
+      tair_trend_year_ch2018, radg_trend_year_ch2018, prec_trend_year_ch2018,
+      tair_trend_seas_ch2018, prec_trend_seas_ch2018,
       RCP, scenario_match
     )],
     by = c("basin", "horizon"),
@@ -154,34 +195,51 @@ combine_avg_data <- function(knmi_avg_dt, ch2018_avg_dt) {
 
 # Step 4: compute absolute and relative differences and an overall score
 compute_differences_and_score <- function(comparison_dt,
-                                          weight_tair = 0.8,
-                                          weight_radg = 0.2,
-                                          weight_prec = 0.0) {
-  # Absolute differences
-  comparison_dt[, tair_avg_diff := tair_avg_knmi - tair_avg_ch2018]
-  comparison_dt[, radg_avg_diff := radg_avg_knmi - radg_avg_ch2018]
-  comparison_dt[, prec_avg_diff := prec_avg_knmi - prec_avg_ch2018]
+                                          weight_tair = 0.6,
+                                          weight_prec = 0.3,
+                                          weight_radg = 0.1) {
+  # Overall absolute differences
+  comparison_dt[, tair_avg_year_diff := tair_avg_year_knmi - tair_avg_year_ch2018]
+  comparison_dt[, radg_avg_year_diff := radg_avg_year_knmi - radg_avg_year_ch2018]
+  comparison_dt[, prec_avg_year_diff := prec_avg_year_knmi - prec_avg_year_ch2018]
   
-  comparison_dt[, tair_trend_diff := tair_trend_knmi - tair_trend_ch2018]
-  comparison_dt[, radg_trend_diff := radg_trend_knmi - radg_trend_ch2018]
-  comparison_dt[, prec_trend_diff := prec_trend_knmi - prec_trend_ch2018]
+  # Seasonal absolute differences
+  comparison_dt[, tair_avg_seas_diff := tair_avg_seas_knmi - tair_avg_seas_ch2018]
+  comparison_dt[, prec_avg_seas_diff := prec_avg_seas_knmi - prec_avg_seas_ch2018]
   
-  # Relative differences (averages)
-  comparison_dt[, tair_avg_diff_rel := tair_avg_diff / tair_avg_knmi]
-  comparison_dt[, radg_avg_diff_rel := radg_avg_diff / radg_avg_knmi]
-  comparison_dt[, prec_avg_diff_rel := prec_avg_diff / prec_avg_knmi]
+  # Overall relative differences
+  comparison_dt[, tair_trend_year_diff := tair_trend_year_knmi - tair_trend_year_ch2018]
+  comparison_dt[, radg_trend_year_diff := radg_trend_year_knmi - radg_trend_year_ch2018]
+  comparison_dt[, prec_trend_year_diff := prec_trend_year_knmi - prec_trend_year_ch2018]
   
-  # Relative differences (trends)
-  comparison_dt[, tair_trend_diff_rel := tair_trend_diff / tair_trend_knmi]
-  comparison_dt[, radg_trend_diff_rel := radg_trend_diff / radg_trend_knmi]
-  comparison_dt[, prec_trend_diff_rel := prec_trend_diff / prec_trend_knmi]
+  # Seasonal relative differences
+  comparison_dt[, tair_trend_seas_diff := tair_trend_seas_knmi - tair_trend_seas_ch2018]
+  comparison_dt[, prec_trend_seas_diff := prec_trend_seas_knmi - prec_trend_seas_ch2018]
+  
+  # Overall relative differences (averages)
+  comparison_dt[, tair_avg_year_diff_rel := tair_avg_year_diff / tair_avg_year_knmi]
+  comparison_dt[, radg_avg_year_diff_rel := radg_avg_year_diff / radg_avg_year_knmi]
+  comparison_dt[, prec_avg_year_diff_rel := prec_avg_year_diff / prec_avg_year_knmi]
+  
+  # Seasonal relative differences
+  comparison_dt[, tair_avg_seas_diff_rel := tair_avg_seas_diff / tair_avg_seas_knmi]
+  comparison_dt[, prec_avg_seas_diff_rel := prec_avg_seas_diff / prec_avg_seas_knmi]
+  
+  # Overall relative differences (trends)
+  comparison_dt[, tair_trend_year_diff_rel := tair_trend_year_diff / tair_trend_year_knmi]
+  comparison_dt[, radg_trend_year_diff_rel := radg_trend_year_diff / radg_trend_year_knmi]
+  comparison_dt[, prec_trend_year_diff_rel := prec_trend_year_diff / prec_trend_year_knmi]
+  
+  # Seasonal relative differences (trends)
+  comparison_dt[, tair_trend_seas_diff_rel := tair_trend_seas_diff / tair_trend_seas_knmi]
+  comparison_dt[, prec_trend_seas_diff_rel := prec_trend_seas_diff / prec_trend_seas_knmi]
   
   # General score: mean of rel avg + rel trend per variable
   comparison_dt[, score := (
-    weight_tair * (abs(tair_avg_diff_rel)) + 
-      weight_radg * (abs(radg_avg_diff_rel)) + 
-      weight_prec * (abs(prec_avg_diff_rel)) 
-  ) / 2]
+    weight_tair * (abs(tair_avg_seas_diff_rel)) + 
+    weight_prec * (abs(prec_avg_seas_diff_rel)) +
+    weight_radg * (abs(radg_avg_year_diff_rel))
+  )]
   
   return(comparison_dt)
 }
@@ -377,10 +435,13 @@ plot_rcp_chains <- function(annual_dt, mean_chain_dt, rcp_name, value_col = "tai
 }
 
 # code -------------------------------------------------------
+# relevant months by Zekollari_2018
+tair_months <- c(5, 6, 7, 10, 11) # May, June, July, October, November
+prec_months <- c(10, 11, 12, 1, 2, 3, 4, 5, 6) # October, November, December, January, February, March, April, May, June
 
 # Compute summaries
-knmi_avg_dt <- horizon_summary_knmi(knmi_meteo_stat_dt)
-ch2018_avg_dt <- horizon_summary_ch2018(ch2018_meteo_dt, knmi_avg_dt)
+knmi_avg_dt <- horizon_summary_knmi(knmi_meteo_stat_dt, "ThS200", tair_months, prec_months)
+ch2018_avg_dt <- horizon_summary_ch2018(ch2018_meteo_dt, knmi_avg_dt, "ThS200", tair_months, prec_months)
 
 # Compare all combinations
 comparison_dt <- combine_avg_data(knmi_avg_dt, ch2018_avg_dt)

@@ -5,7 +5,7 @@ SCENARIO="Ln_2100"    # e.g., reference, rcp85
 ENSEMBLES=1 #$(seq 1 8)    # e.g., 1 2 3 4 or $(seq 1 8)
 EZG="ThS200"               # Set to specific EZG (e.g., "Rhb200"), or leave empty to copy all
 
-RUN_TYPE="with_glac_sdbc" 
+RUN_TYPE="sund_bc" 
 
 REMOTE_USER="nydegger"
 REMOTE_HOST="hyperion.wsl.ch"

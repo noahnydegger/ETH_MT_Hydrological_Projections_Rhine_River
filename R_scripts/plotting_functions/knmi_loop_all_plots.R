@@ -7,7 +7,7 @@ plot_dir <- file.path(home_dir, "Plots", "Reference_Period_Analysis", "glacier_s
 plot_dir <- file.path(home_dir, "Plots", "Reference_Period_Analysis", "sund_BC")
 
 info_text = "_Ln_2100_glac_sdbc"
-info_text = ""
+info_text = "sund_bc"
   
 # select the dataset to plot: mit_output, meteo_stat, discharge
 dataset <- "discharge"
@@ -15,6 +15,7 @@ dataset <- "discharge"
 plot_selection <- c(
   "seasonality" = FALSE,
   "annual_boxplot" = TRUE,
+  "seasonal_boxplot" = TRUE,
   "pdf_cdf" = FALSE,
   "duration_curve" = FALSE,
   "initial_condition" = FALSE
@@ -36,7 +37,7 @@ scen_var_hor_sel <- c("none_none_ref", "none_none_hindcast", "none_none_observat
 
 run_type_sel <- c("observation", "hindcast", "sund_bc", "no_sund_bc", "with_glac_sdbc", "with_glac_sund")
 #run_type_sel <- c("no_sund_bc", "sund_bc","with_glac_sund", "with_glac_sdbc")
-run_type_sel <- c("hindcast", "observation", "sund_bc", "no_sund_bc")
+run_type_sel <- c("observation", "hindcast", "sund_bc", "no_sund_bc")
 
 color_col <- "run_type"
 
@@ -50,7 +51,7 @@ if (dataset == "mit_output") {
   
 } else if (dataset == "discharge") {
   basin_sel <- unique(knmi_discharge_dt$station)
-  #basin_sel <- c("Basel Rheinhalle")
+  basin_sel <- c("Basel Rheinhalle")
   value_cols <- c("discharge")
   dt_dataset <- knmi_discharge_dt
   setnames(dt_dataset, old = "station", new = "basin", skip_absent = TRUE)
@@ -116,17 +117,48 @@ if (plot_selection["annual_boxplot"]) {
   
   group_cols <- c("basin", "scen_var_hor", "hydro_model", "run_type")
   
+  statistics <- c("mean", "min", "max", "7day_low")#, "min", "max", "7day_low")
+  
   # generate annual boxplots
   for (bsn in basin_sel) {
     dt <- dt_subset[basin == bsn]
     for (value_col in value_cols) {
       if (all(is.na(dt[[value_col]]))) next
-      cat("Plotting annual boxplot for", bsn, value_col, "\n")
-      
-      plot_annual_boxplots(dt, plot_dir, bsn, color_col, value_col, group_cols, info_text)
+      for (stat in statistics) {
+        cat("Plotting annual boxplot for", bsn, value_col, stat, "\n")
+        
+        dt_annual <- compute_annual_or_seasonal(dt, value_col, group_cols, statistic = stat, seasonal = FALSE)
+        
+        plot_annual_boxplots(dt_annual, plot_dir, bsn, color_col, run_type_sel, value_col, group_cols, stat, info_text)
+      } # stat loop
     } # column loop
   } # basin loop
 } # annual boxplot plot
+
+# seasonal boxplot plot ------------------------------------------------------
+if (plot_selection["seasonal_boxplot"]) {
+  
+  source(here("R_scripts", "plotting_functions", "plot_annual_mean.R"))
+  
+  group_cols <- c("basin", "scen_var_hor", "hydro_model", "run_type")
+  
+  statistics <- c("mean", "min", "max", "7day_low")
+  
+  # generate annual boxplots
+  for (bsn in basin_sel) {
+    dt <- dt_subset[basin == bsn]
+    for (value_col in value_cols) {
+      if (all(is.na(dt[[value_col]]))) next
+      for (stat in statistics) {
+        cat("Plotting seasonal boxplot for", bsn, value_col, stat, "\n")
+        
+        dt_seasonal <- compute_annual_or_seasonal(dt, value_col, group_cols, statistic = stat, seasonal = TRUE)
+        
+        plot_seasonal_boxplots(dt_seasonal, plot_dir, bsn, color_col, run_type_sel, value_col, group_cols, stat, info_text)
+      } # stat loop
+    } # column loop
+  } # basin loop
+} # seasonal boxplot plot
 
 # pdf & cdf plot -----------------------------------------------------------
 if (plot_selection["pdf_cdf"]) {

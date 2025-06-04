@@ -295,7 +295,7 @@ hindcast_sund_stats[, `:=`(
 
 setnames(hindcast_sund_stats, old = "ensemble", new = "member")
 
-hindcast_files_dt <- add_scenario_horizon_grouping_columns(hindcast_sund_stats)
+hindcast_sund_stats <- add_scenario_horizon_grouping_columns(hindcast_sund_stats)
 
 # ----------------------------
 # Step 3: Process KNMI reference (ens1 to ens8)

@@ -303,23 +303,23 @@ compute_differences_and_score <- function(comparison_dt,
   
   # V4
   # Standardized differences
-  comparison_dt[, tair_z := (tair_avg_seas_ch2018 - tair_avg_seas_knmi) / tair_avg_seas_sd_knmi]
-  comparison_dt[, prec_z := (prec_avg_seas_ch2018 - prec_avg_seas_knmi) / prec_avg_seas_sd_knmi]
-  comparison_dt[, radg_z := (radg_avg_year_ch2018 - radg_avg_year_knmi) / radg_avg_year_sd_knmi]
-  
-  comparison_dt[, tair_trend_z := (tair_trend_seas_ch2018 - tair_trend_seas_knmi) / tair_trend_seas_sd_knmi]
-  comparison_dt[, prec_trend_z := (prec_trend_seas_ch2018 - prec_trend_seas_knmi) / prec_trend_seas_sd_knmi]
-  comparison_dt[, radg_trend_z := (radg_trend_year_ch2018 - radg_trend_year_knmi) / radg_trend_year_sd_knmi]
-  
-  # Weighted Euclidean score
-  comparison_dt[, score := sqrt(
-    (wt_tair_mean * tair_z)^2 +
-      (wt_tair_trend * tair_trend_z)^2 +
-      (wt_prec_mean * prec_z)^2 +
-      (wt_prec_trend * prec_trend_z)^2 +
-      (wt_radg_mean * radg_z)^2 +
-      (wt_radg_trend * radg_trend_z)^2
-  )]
+  # comparison_dt[, tair_z := (tair_avg_seas_ch2018 - tair_avg_seas_knmi) / tair_avg_seas_sd_knmi]
+  # comparison_dt[, prec_z := (prec_avg_seas_ch2018 - prec_avg_seas_knmi) / prec_avg_seas_sd_knmi]
+  # comparison_dt[, radg_z := (radg_avg_year_ch2018 - radg_avg_year_knmi) / radg_avg_year_sd_knmi]
+  # 
+  # comparison_dt[, tair_trend_z := (tair_trend_seas_ch2018 - tair_trend_seas_knmi) / tair_trend_seas_sd_knmi]
+  # comparison_dt[, prec_trend_z := (prec_trend_seas_ch2018 - prec_trend_seas_knmi) / prec_trend_seas_sd_knmi]
+  # comparison_dt[, radg_trend_z := (radg_trend_year_ch2018 - radg_trend_year_knmi) / radg_trend_year_sd_knmi]
+  # 
+  # # Weighted Euclidean score
+  # comparison_dt[, score := sqrt(
+  #   (wt_tair_mean * tair_z)^2 +
+  #     (wt_tair_trend * tair_trend_z)^2 +
+  #     (wt_prec_mean * prec_z)^2 +
+  #     (wt_prec_trend * prec_trend_z)^2 +
+  #     (wt_radg_mean * radg_z)^2 +
+  #     (wt_radg_trend * radg_trend_z)^2
+  # )]
   
   # V3
   # Standardized differences using KNMI SDs
@@ -329,9 +329,9 @@ compute_differences_and_score <- function(comparison_dt,
 
   # Euclidean distance score (weighted)
   comparison_dt[, score := sqrt(
-    (weight_tair * tair_z)^2 +
-      (weight_prec * prec_z)^2 +
-      (weight_radg * radg_z)^2
+    weight_tair * (tair_z^2) +
+      weight_prec * (prec_z^2) +
+      weight_radg * (radg_z^2)
   )]
   
   return(comparison_dt)
@@ -601,7 +601,7 @@ write_best_glchains_to_file(
   mean_chain_10yr_dt,
   mean_chain_10yr_ref_dt,
   output_dir,
-  "glchains_overall_V4.txt"
+  "glchains_overall_V3.txt"
 )
 
 write_best_glchains_to_file(
@@ -609,5 +609,5 @@ write_best_glchains_to_file(
   mean_chain_10yr_dt,
   mean_chain_10yr_ref_dt,
   output_dir,
-  "glchains_scenario_V4.txt"
+  "glchains_scenario_V3.txt"
 )

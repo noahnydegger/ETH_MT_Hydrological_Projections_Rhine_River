@@ -11,18 +11,31 @@ all_scenario_horizons <- c(
   "Mn_2050", "Mn_2100", "Mn_2150",
   "Ld_2100", "Ln_2100",
   "L_2033",
-  "reference",
-  "Hindcast",
-  "Observation"
+  "eference", # upper and lower case
+  "indcast", # upper and lower case
+  "bservation" # upper and lower case
 )
 
 scenario_horizons <- c(
   "Hd_2050", "Hd_2100", "Hd_2150",
+  "Hn_2050", "Hn_2100", "Hn_2150",
+  "Md_2050", "Md_2100", "Md_2150",
+  "Mn_2050", "Mn_2100", "Mn_2150",
   "Ld_2100", "Ln_2100",
-  "Md_2150"
+  "L_2033",
+  "eference", # upper and lower case
+  "indcast", # upper and lower case
+  "bservation" # upper and lower case
 )
 
-run_type_sel <- c("Observation", "Hindcast", "sund_bc", "no_sund_bc", "with_glac_sdbc", "with_glac_sund")
+all_run_types <- c(
+  "bservation", "indcast",  # upper and lower case
+  "sund_bc", "no_sund_bc",
+  "with_glac_sdbc", "with_glac_sund",
+  "future_V1"
+)
+run_type_sel <- c("sund_bc", "with_glac_sdbc")
+run_type_sel <- c("bservation", "indcast", "future_V1")
 
 # To include all .rds files without filtering, uncomment the lines below:
 # scenario_horizons <- character(0)
@@ -35,8 +48,8 @@ knmi_variables <- list(
   knmi_meteo_stat_dt = list(read = FALSE, read_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "prevah_meteo_stat_knmi.rds"),
                             combine = FALSE, combine_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "meteo_stat")),
   
-  knmi_discharge_dt = list(read = TRUE, read_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "prevah_discharge_knmi.rds"),
-                           combine = FALSE, combine_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "discharge")),
+  knmi_discharge_dt = list(read = FALSE, read_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "prevah_discharge_knmi.rds"),
+                           combine = TRUE, combine_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "discharge")),
   
   knmi_discharge_dt_rblick = list(read = FALSE, read_dir = "path/to/discharge_data.rds")
 )
@@ -115,19 +128,20 @@ combine_rds_scenario_data <- function(var_list) {
     # Assign to global variable and save as .rds
     assign(varname, combined_dt, envir = .GlobalEnv)
     
+    message("Combined data '", varname, "'")
+    
     # Save as RDS only if no filtering was applied
     if (length(scenario_horizons) == 0 && length(run_type_sel) == 0) {
       saveRDS(combined_dt, file = read_dir)
+      
+      # Also save as CSV (same base name, .csv extension)
+      csv_path <- sub("\\.rds$", ".csv", read_dir)
+      data.table::fwrite(combined_dt, file = csv_path)
+      
+      message("Saved combined '", varname, "' to: ", read_dir)
     }
-    
-    # Also save as CSV (same base name, .csv extension)
-    csv_path <- sub("\\.rds$", ".csv", read_dir)
-    data.table::fwrite(combined_dt, file = csv_path)
-    
-    message("Combined and saved '", varname, "' to: ", read_dir)
   }
 }
-
 
 # code -----------------------------------------------------------------
 read_variables_from_list(knmi_variables)

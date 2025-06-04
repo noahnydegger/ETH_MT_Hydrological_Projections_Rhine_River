@@ -4,14 +4,17 @@ library(data.table)
 source(here("R_scripts", "plotting_functions", "knmi_plot_metadata.R"))
 
 # PDF Plot Function
-plot_pdf <- function(dt, plot_dir, bsn, color_col, value_col, group_cols) {
+plot_pdf <- function(dt, plot_dir, bsn, color_col, color_col_levels, value_col, group_cols, info_text) {
   
   value_name <- plot_info$column_info$names[[value_col]]
   value_unit <- plot_info$column_info$units[[value_col]]
   
+  # Ensure color column has defined factor levels
+  dt[, (color_col) := factor(get(color_col), levels = color_col_levels)]
+  
   p <- ggplot(dt, aes(x = .data[[value_col]], color = .data[[color_col]])) +
-    stat_density(geom = "line") +
-    labs(title = paste("PDF", value_name, bsn),
+    stat_density(geom = "line", linewidth = 2) +
+    labs(title = paste("PDF", value_name, bsn, info_text),
          x = paste(value_name, value_unit),
          y = "Density",
          color = "Dataset"
@@ -28,21 +31,24 @@ plot_pdf <- function(dt, plot_dir, bsn, color_col, value_col, group_cols) {
   
   # Save the plot
   save_dir <- file.path(plot_dir, "Distribution", value_col)
-  filename <- paste0("pdf_", bsn, "_", value_col, ".pdf")
+  filename <- paste0("pdf_", bsn, "_", value_col, info_text, ".pdf")
   save_plot(p, save_dir, filename, width = 8, height = 6)
 }
 
 # CDF Plot Function
-plot_cdf <- function(dt, plot_dir, bsn, color_col, value_col, group_cols) {
+plot_cdf <- function(dt, plot_dir, bsn, color_col, color_col_levels, value_col, group_cols, info_text) {
   
   value_name <- plot_info$column_info$names[[value_col]]
   value_unit <- plot_info$column_info$units[[value_col]]
   
+  # Ensure color column has defined factor levels
+  dt[, (color_col) := factor(get(color_col), levels = color_col_levels)]
+  
   p <- ggplot(dt, aes(x = .data[[value_col]], color = .data[[color_col]])) +
-    stat_ecdf(geom = "step") +  # Step plot for CDF
+    stat_ecdf(geom = "step", linewidth = 2) +  # Step plot for CDF
     #stat_ecdf(aes(x = .data[[value_col_month]]), geom = "step", linetype = "dashed") +  # CDF for value_col_month (dashed)
     #stat_ecdf(aes(x = .data[[value_col_overall]]), geom = "step", linetype = "dotted") +  # CDF for value_col_overall (dotted)
-    labs(title = paste("CDF", value_name, bsn),
+    labs(title = paste("CDF", value_name, bsn, info_text),
          x = paste(value_name, value_unit),
          y = "Cumulative Probability",
          color = "Dataset"
@@ -58,6 +64,6 @@ plot_cdf <- function(dt, plot_dir, bsn, color_col, value_col, group_cols) {
   
   # Save the plot
   save_dir <- file.path(plot_dir, "Distribution", value_col)
-  filename <- paste0("cdf_", bsn, "_", value_col, ".pdf")
+  filename <- paste0("cdf_", bsn, "_", value_col, info_text, ".pdf")
   save_plot(p, save_dir, filename, width = 8, height = 6)
 }

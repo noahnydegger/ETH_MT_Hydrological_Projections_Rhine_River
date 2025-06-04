@@ -1,12 +1,13 @@
 library(data.table)
 library(zoo)
 library(hydroGOF)
+library(grid)
 
 
 source(here("R_scripts", "data_processing_functions", "gof_metrics.R"))
 source(here("R_scripts", "plotting_functions", "knmi_plot_metadata.R"))
 
-compute_rolling_stats <- function(dt, group_cols, value_cols, stat = "mean", width = 30) {
+compute_rolling_stats_old <- function(dt, group_cols, value_cols, stat = "mean", width = 30) {
   # Create a copy of the data to avoid modifying the original
   dt <- copy(dt)
   
@@ -30,6 +31,44 @@ compute_rolling_stats <- function(dt, group_cols, value_cols, stat = "mean", wid
   return(dt)
 }
 
+compute_rolling_stats <- function(dt, group_cols, value_cols, stat = "mean", width = 30) {
+  stopifnot(stat %in% c("mean"))  # Only "mean" is supported in this optimized version
+  
+  group_cols <- c(group_cols, "member")
+  # Keep date and group_cols for the new result table
+  keep_cols <- unique(c("date", group_cols))
+  result_dt <- unique(dt[, ..keep_cols])  # only one row per date-group
+  result_dt <- copy(dt)
+  
+  compute_frollmean_partial <- function(x, n = width) {
+    len <- length(x)
+    half <- floor(n / 2)
+    result <- frollmean(x, n = n, align = "center", fill = NA, na.rm = TRUE)
+    
+    # Fill start
+    for (i in seq_len(half)) {
+      result[i] <- mean(x[1:(i + half)], na.rm = TRUE)
+    }
+    
+    # Fill end
+    for (i in (len - half + 1):len) {
+      result[i] <- mean(x[(i - half):len], na.rm = TRUE)
+    }
+    
+    return(result)
+  }
+  
+  for (val_col in value_cols) {
+    new_col <- paste0("rm_", val_col)
+    result_dt[, (new_col) := compute_frollmean_partial(get(val_col), n = width), by = group_cols]
+  }
+  
+  result_dt <- result_dt[as.numeric(format(date, "%j")) != 366]
+  result_dt[, DayOfYear := as.numeric(format(date, "%j"))]
+  
+  return(result_dt)
+}
+
 # Function to compute mean of selected columns grouped by specified columns
 compute_seasonality <- function(dt, group_cols, value_cols, stat = "mean", q_bot = 0.25, q_top = 0.75) {
   # Ensure required columns are present
@@ -48,7 +87,15 @@ compute_seasonality <- function(dt, group_cols, value_cols, stat = "mean", q_bot
 }
 
 # Function to plot the statistics
-plot_seasonality_ts <- function(dt, plot_dir, bsn, info_col, color_col, value_col, stat, info_text, q_bot = 0.10, q_top = 0.90, show_ensemble = FALSE, show_range = FALSE, gof_pairs = NULL) {
+plot_seasonality_ts <- function(
+    dt, plot_dir, bsn, 
+    info_col, 
+    color_col, color_col_levels, 
+    line_col, line_col_levels, 
+    value_col, 
+    comparison_col, comparison_ref, 
+    stat, info_text, 
+    q_bot = 0.25, q_top = 0.75, show_ensemble = FALSE, show_range = FALSE, gof_pairs = NULL) {
   
   value_name <- plot_info$column_info$names[[info_col]]
   value_unit <- plot_info$column_info$units[[info_col]]
@@ -56,6 +103,9 @@ plot_seasonality_ts <- function(dt, plot_dir, bsn, info_col, color_col, value_co
   stat_col <- paste0(stat, "_", value_col)
   q_bot_col <- paste0("q_bot_", value_col)
   q_top_col <- paste0("q_top_", value_col)
+  
+  # Ensure color column has defined factor levels
+  dt[, (color_col) := factor(get(color_col), levels = color_col_levels)]
   
   if (!is.null(gof_pairs)) {
 
@@ -83,18 +133,38 @@ plot_seasonality_ts <- function(dt, plot_dir, bsn, info_col, color_col, value_co
 
   # Plot
   p <- ggplot(dt, aes(x = as.Date(DayOfYear - 1, origin = "2023-01-01"),
-                                     group = .data[[color_col]], color = .data[[color_col]])) +
+                      group = .data[[color_col]], 
+                      color = .data[[color_col]], 
+                      linetype = .data[[line_col]])) +
     geom_vline(xintercept = as.numeric(month_lines), color = "gray90")
 
   if (show_range) {
-    p <- p + geom_ribbon(aes(ymin = .data[[q_bot_col]], ymax = .data[[q_top_col]], fill = .data[[color_col]]), alpha = 0.4)
+    p <- p + geom_ribbon(
+      data = dt[get(comparison_col) == comparison_ref],
+      aes(
+        x = as.Date(DayOfYear - 1, origin = "2023-01-01"),
+        ymin = .data[[q_bot_col]],
+        ymax = .data[[q_top_col]],
+        fill = .data[[color_col]]
+      ),
+      alpha = 0.4,
+      inherit.aes = FALSE
+    )
   }
 
   if (show_ensemble) {
     p <- p + geom_line(aes(y = .data[[stat_col]], color = .data[[color_col]]), linewidth = 0.7)
   }
 
-  p <- p + geom_line(aes(y = .data[[stat_col]]), linewidth = 2) +
+  p <- p + geom_line(
+    aes(
+      y = .data[[stat_col]],
+      color = .data[[color_col]],
+      linetype = .data[[line_col]],
+      group = interaction(.data[[color_col]], .data[[line_col]])
+    ),
+    linewidth = 2
+  ) +
     scale_x_date(date_labels = "%b", breaks = month_labels, expand = c(0, 0)) +
     labs(
       title = paste("30-day Moving Average", value_name, bsn, info_text),
@@ -102,17 +172,23 @@ plot_seasonality_ts <- function(dt, plot_dir, bsn, info_col, color_col, value_co
       x = "Month",
       y = paste(value_name, value_unit),
       color = "Dataset",
-      fill = "Dataset"
+      linetype = "Dataset",
+      fill = paste0(q_bot * 100, "-", q_top * 100, " % Quantile")
     ) +
     custom_theme() +
     theme(
+      legend.key.width = unit(2, "cm"),  # Adjust to your liking (default ~1.2cm)
       axis.title.x = element_blank()  # Remove the x-axis title
     ) +
     scale_color_manual(
       values = plot_info[[color_col]]$colors,
       labels = plot_info[[color_col]]$labels
     ) +
-    #ylim(0.2, 0.7) +
+    scale_linetype_manual(
+      values = plot_info[[line_col]]$linetypes,
+      labels = plot_info[[line_col]]$labels
+    ) +
+    #ylim(0.2, 0.55) +
     (if (show_range) scale_fill_manual(
       values = plot_info[[color_col]]$colors,
       labels = plot_info[[color_col]]$labels

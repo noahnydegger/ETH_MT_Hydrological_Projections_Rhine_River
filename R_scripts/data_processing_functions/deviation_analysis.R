@@ -21,17 +21,29 @@ compute_monthly_differences <- function(dt, group_cols, value_cols, comparison_c
                 by = c(group_cols, comparison_col, "MM"),
                 .SDcols = value_cols]
   
-  # Compute absolute differences
-  dt_mean[, (paste0(value_cols, "_abs_dev")) := 
-            lapply(value_cols, function(col) .SD[[col]] - .SD[[col]][get(comparison_col) == ref_scenario]),
-          by = c(group_cols, "MM"), .SDcols = value_cols]
+  ref_values <- dt_mean[get(comparison_col) == ref_scenario,
+                        .SD, .SDcols = c("MM", "basin", value_cols)]
+  setnames(ref_values, value_cols, paste0(value_cols, "_ref"))
   
-  # Compute relative differences
-  dt_mean[, (paste0(value_cols, "_rel_dev")) := 
-            lapply(value_cols, function(col) 
-              (.SD[[col]] - .SD[[col]][get(comparison_col) == ref_scenario]) /
-                .SD[[col]][get(comparison_col) == ref_scenario]),
-          by = c(group_cols, "MM"), .SDcols = value_cols]
+  dt_mean <- merge(dt_mean, ref_values, by = c("MM", "basin"), all.x = TRUE)
+  
+  for (col in value_cols) {
+    ref_col <- paste0(col, "_ref")
+    dt_mean[, paste0(col, "_abs_dev") := get(col) - get(ref_col)]
+    dt_mean[, paste0(col, "_rel_dev") := (get(col) - get(ref_col)) / get(ref_col)]
+  }
+  
+  # # Compute absolute differences
+  # dt_mean[, (paste0(value_cols, "_abs_dev")) := 
+  #           lapply(value_cols, function(col) .SD[[col]] - .SD[[col]][get(comparison_col) == ref_scenario]),
+  #         by = c(group_cols, "MM"), .SDcols = value_cols]
+  # 
+  # # Compute relative differences
+  # dt_mean[, (paste0(value_cols, "_rel_dev")) := 
+  #           lapply(value_cols, function(col) 
+  #             (.SD[[col]] - .SD[[col]][get(comparison_col) == ref_scenario]) /
+  #               .SD[[col]][get(comparison_col) == ref_scenario]),
+  #         by = c(group_cols, "MM"), .SDcols = value_cols]
   
   # Optionally drop the Month column if not needed
   dt_mean[, MM := factor(month.abb[MM], levels = month.abb[1:12])]
@@ -57,17 +69,38 @@ compute_overall_difference <- function(dt, group_cols, value_cols, comparison_co
                 by = c(group_cols, comparison_col),
                 .SDcols = value_cols]
   
-  # Compute absolute deviations
-  dt_mean[, (paste0(value_cols, "_abs_dev")) := 
-            lapply(value_cols, function(col) .SD[[col]] - .SD[[col]][get(comparison_col) == ref_scenario]),
-          by = c(group_cols), .SDcols = value_cols]
+  ref_values <- dt_mean[get(comparison_col) == ref_scenario,
+                        .SD, .SDcols = c(group_cols, value_cols)]
+  setnames(ref_values, value_cols, paste0(value_cols, "_ref"))
   
-  # Compute relative deviations
-  dt_mean[, (paste0(value_cols, "_rel_dev")) := 
-            lapply(value_cols, function(col) 
-              (.SD[[col]] - .SD[[col]][get(comparison_col) == ref_scenario]) /
-                .SD[[col]][get(comparison_col) == ref_scenario]),
-          by = c(group_cols), .SDcols = value_cols]
+  # Step 3: Merge back by basin only (or your chosen group keys)
+  merge_cols <- c("basin")  # or any grouping columns excluding run_type
+  ref_cols <- c(merge_cols, paste0(value_cols, "_ref"))
+  
+  dt_mean <- merge(
+    dt_mean,
+    ref_values[, ..ref_cols],
+    by = merge_cols,
+    all.x = TRUE
+  )
+  
+  for (col in value_cols) {
+    ref_col <- paste0(col, "_ref")
+    dt_mean[, paste0(col, "_abs_dev") := get(col) - get(ref_col)]
+    dt_mean[, paste0(col, "_rel_dev") := (get(col) - get(ref_col)) / get(ref_col)]
+  }
+  
+  # # Compute absolute deviations
+  # dt_mean[, (paste0(value_cols, "_abs_dev")) := 
+  #           lapply(value_cols, function(col) .SD[[col]] - .SD[[col]][get(comparison_col) == ref_scenario]),
+  #         by = c(group_cols), .SDcols = value_cols]
+  # 
+  # # Compute relative deviations
+  # dt_mean[, (paste0(value_cols, "_rel_dev")) := 
+  #           lapply(value_cols, function(col) 
+  #             (.SD[[col]] - .SD[[col]][get(comparison_col) == ref_scenario]) /
+  #               .SD[[col]][get(comparison_col) == ref_scenario]),
+  #         by = c(group_cols), .SDcols = value_cols]
   
   # Exclude the reference scenario from the dt_mean
   dt_mean <- dt_mean[get(comparison_col) != ref_scenario]
@@ -78,7 +111,7 @@ compute_overall_difference <- function(dt, group_cols, value_cols, comparison_co
 
 
 # Function to plot monthly and yearly boxplots from daily data.table
-plot_monthly_yearly_boxplots <- function(dt_month, dt_overall, info_col, color_col, value_col, dev_type) {
+plot_monthly_yearly_boxplots <- function(dt_month, dt_overall, plot_dir, info_col, color_col, value_col, dev_type, info_text) {
   
   value_name <- plot_info$column_info$names[[info_col]]
   value_unit <- plot_info$column_info$units[[info_col]]
@@ -86,9 +119,9 @@ plot_monthly_yearly_boxplots <- function(dt_month, dt_overall, info_col, color_c
   # Plotting
   p <- ggplot(dt_month, aes(x = MM, y = .data[[value_col]], fill = .data[[color_col]])) +
     geom_boxplot(position = position_dodge(width = 0.8)) +
-    labs(title = paste(dev_type, "difference to hindcast", value_name, "over all basins"),
+    labs(title = paste(dev_type, "difference to observed", value_name, "over all basins"),
          x = "Month",
-         y = paste(value_name, value_unit),
+         y = paste(value_name, if (dev_type == "rel") "[-]" else value_unit),
          fill = "Dataset"
     ) +
     custom_theme() +
@@ -109,8 +142,8 @@ plot_monthly_yearly_boxplots <- function(dt_month, dt_overall, info_col, color_c
     )
   
   # Save the plot
-  save_dir <- file.path(here::here(), "Plots", "Reference_Period_Analysis", "bias_correction", paste0(info_col, "_diff"))
-  filename <- paste0(value_col, ".pdf")
+  save_dir <- file.path(plot_dir, "monthly_yearly_boxplots")
+  filename <- paste0(value_col, info_text, ".pdf")
   save_plot(p, save_dir, filename, width = 18, height = 6)
 }
 

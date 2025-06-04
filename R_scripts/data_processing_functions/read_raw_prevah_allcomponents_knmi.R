@@ -4,7 +4,7 @@ library(data.table)
 # project directory
 home_dir <- file.path(here::here())
 
-run_type <- "with_glac_sdbc"
+run_type <- "future_V1"
 
 # input directories
 input_dir_knmi <- file.path(home_dir, "Data", "Rheinblick2027", "raw_prevah_output", paste0("R_KNMI", "_", run_type))
@@ -31,9 +31,9 @@ all_scenario_horizons <- c(
 )
 
 scenario_horizons <- c(
-  "Hd_2050", "Hd_2100", "Hd_2150",
-  "Ld_2100", "Ln_2100",
-  "Md_2150"
+  "Hd_2050",
+  "L_2033",
+  "Md_2150", "Mn_2150"
 )
 read_hindcast <- FALSE
 
@@ -397,7 +397,7 @@ if (read_hindcast) {
     
     if (!(ezg %in% no_meteo_gebiete)) {
       # Process meteo statistics data
-      all_meteo_data_dt <- process_meteo_stats_data(ezg_dir, meteo_variables_hind, meteo_stat_file_suffix_hind, horizon, scenario, variant, member, ezg, run_type_hind)
+      all_meteo_data_dt <- process_meteo_stats_data(ezg_dir, meteo_variables_hind, meteo_stat_file_suffix_hind, "observation", scenario, variant, member, ezg, "observation")
       
       # Create a named vector for mapping
       replacement_map <- setNames(meteo_variables_knmi, meteo_variables_hind)

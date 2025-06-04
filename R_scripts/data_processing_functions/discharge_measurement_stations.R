@@ -191,20 +191,4 @@ observation_files <- list(
   "2181.daily.mean.dat" = c("Thur_Halden")
 )
 
-# # file prefix = c(station names)
-# knmi_routing_files <- list(
-#   "Swissrhine200_" = c("Rekingen", "Untersiggenthal", "Rheinfelden", "Basel Rheinhalle", "Wiese"),
-#   #"Birs200_" = c(),
-#   "Thur200_" = c("hal", "mur", "rem", "Andelfingen")
-# )
-# 
-# # file name = c(station names)
-# hind_routing_files <- list(
-#   "Swissrhine200_CTRL_RUN_WSL_F_2021_g73.dat" = c("Rekingen", "Untersiggenthal", "Rheinfelden", "Basel Rheinhalle", "Wiese")
-# )
-# 
-# # file name = c(station names)
-# observation_files <- list(
-#   "2289.daily.mean.dat" = c("Basel Rheinhalle")
-# )
 

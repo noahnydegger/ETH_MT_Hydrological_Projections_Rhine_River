@@ -4,7 +4,7 @@ library(data.table)
 # project directory
 home_dir <- file.path(here::here())
 
-run_type <- "no_sund_bc"
+run_type <- "future_V1"
 
 # input directories
 input_dir_knmi <- file.path(home_dir, "Data", "Rheinblick2027", "raw_prevah_output", paste0("routing", "_", run_type))
@@ -33,19 +33,22 @@ gebiete <- c(
 )
 
 all_scenario_horizons <- c(
-  "reference", 
+  "Hd_2050", "Hd_2100", "Hd_2150",
+  "Hn_2050", "Hn_2100", "Hn_2150",
+  "Md_2050", "Md_2100", "Md_2150",
+  "Mn_2050", "Mn_2100", "Mn_2150",
+  "Ld_2100", "Ln_2100",
   "L_2033",
-  "Md_2050", "Mn_2050", "Hd_2050", "Hn_2050",
-  "Md_2100", "Mn_2100", "Hd_2100", "Hn_2100", "Ld_2100", "Ln_2100",
-  "Md_2150", "Mn_2150", "Hd_2150", "Hn_2150"
+  "reference"
 )
 
 scenario_horizons <- c(
-
+  "Hd_2150"
 )
+# "Hd_2150" problem with ens 4 Swissrhine
 
 read_hindcast <- FALSE
-read_observation <- TRUE
+read_observation <- FALSE
 
 # functions ---------------------------------------------------------------
 read_raw_discharge_data <- function(file_path, column_names) {
@@ -215,8 +218,9 @@ export_discharge_per_scenario_horizon <- function(dt, output_dir, source = "disc
     export_data <- .SD[, .(station, date, discharge, unit, horizon, scenario,
                            variant, member, scen_var, scen_var_hor, period, run_type, hydro_model, source)]
     
-    fwrite(export_data, file_path_csv)
     saveRDS(export_data, file_path_rds)
+    fwrite(export_data, file_path_csv)
+    
   }, by = .(scenario, variant, horizon)]
   
   message("Export discharge per scenario-horizon successful for run_type: ", run_type_name)

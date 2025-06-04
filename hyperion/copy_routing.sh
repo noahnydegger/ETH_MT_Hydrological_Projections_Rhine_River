@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # === CONFIGURATION ===
-SCENARIO="reference"        # e.g., reference, rcp85
+SCENARIO="Hd_2150"        # e.g., reference, rcp85
 ENSEMBLES=$(seq 1 8)        # e.g., 1 2 3 4
-EZG=""                      # Set to e.g. "NoW200", or leave empty to copy all
+EZG=                      # Set to e.g. "NoW200", or leave empty to copy all
 
-RUN_TYPE="sund_bc"
+RUN_TYPE="future_V1"
 
 REMOTE_USER="nydegger"
 REMOTE_HOST="hyperion.wsl.ch"

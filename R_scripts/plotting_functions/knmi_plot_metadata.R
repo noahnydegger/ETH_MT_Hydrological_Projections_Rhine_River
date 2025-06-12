@@ -63,7 +63,7 @@ plot_info <- list(
       "L" = "Low",
       "M" = "Moderate",
       "H" = "High",
-      "none" = "none"
+      "none" = "Reference"
     )
   ),
   variant = list(
@@ -109,15 +109,17 @@ plot_info <- list(
     colors = c(
       "none_none" = "grey50",
       # L scenario (blue)
-      "L_none" = "#99c2e0",
-      "L_dry"  = "#003466",
-      "L_wet"  = "#66a3d2",
+      "L_dry"  = rgb(20, 70, 130, maxColorValue = 255),      # Deep blue
+      "L_wet"  = rgb(102, 153, 204, maxColorValue = 255),   # Lighter blue
+      "L_none" = rgb(153, 194, 230, maxColorValue = 255),    # Light blue
+      
       # M scenario (orange)
-      "M_dry"  = "#bf5f00",
-      "M_wet"  = "#f9c684",
+      "M_dry"  = rgb(247, 148, 32, maxColorValue = 255),    # Orange
+      "M_wet"  = rgb(255, 198, 128, maxColorValue = 255),   # Lighter orange
+      
       # H scenario (red)
-      "H_dry"  = "#990002",
-      "H_wet"  = "#f2b6b6"
+      "H_dry"  = rgb(180, 30, 30, maxColorValue = 255),       # Deep red
+      "H_wet" = rgb(222, 152, 152, maxColorValue = 255)    # Lighter red
     ),
     linetypes = c(
       "none_none" = "solid",
@@ -134,13 +136,13 @@ plot_info <- list(
     ),
     labels = c(
       "none_none" = "Reference",
-      "L_none" = "dry",
-      "L_dry" = "dry",
-      "L_wet" = "wet",
-      "M_dry" = "dry",
-      "M_wet" = "wet",
-      "H_dry" = "dry",
-      "H_wet" = "wet"
+      "L_none" = "L 2033",
+      "L_dry" = "L dry",
+      "L_wet" = "L wet",
+      "M_dry" = "M dry",
+      "M_wet" = "M wet",
+      "H_dry" = "H dry",
+      "H_wet" = "H wet"
     )
   ),
   scen_hor = list(

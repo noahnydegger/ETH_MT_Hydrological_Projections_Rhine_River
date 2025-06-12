@@ -2,6 +2,7 @@ library(data.table)
 library(zoo)
 library(hydroGOF)
 library(grid)
+library(patchwork)
 
 
 source(here("R_scripts", "data_processing_functions", "gof_metrics.R"))
@@ -95,7 +96,8 @@ plot_seasonality_ts <- function(
     value_col, 
     comparison_col, comparison_ref, 
     stat, info_text, 
-    q_bot = 0.25, q_top = 0.75, show_ensemble = FALSE, show_range = FALSE, gof_pairs = NULL) {
+    q_bot = 0.25, q_top = 0.75, show_ensemble = FALSE, show_range = FALSE, gof_pairs = NULL,
+    save_p = TRUE) {
   
   value_name <- plot_info$column_info$names[[info_col]]
   value_unit <- plot_info$column_info$units[[info_col]]
@@ -106,6 +108,7 @@ plot_seasonality_ts <- function(
   
   # Ensure color column has defined factor levels
   dt[, (color_col) := factor(get(color_col), levels = color_col_levels)]
+  dt[, (line_col) := factor(get(line_col), levels = line_col_levels)]
   
   if (!is.null(gof_pairs)) {
 
@@ -165,14 +168,14 @@ plot_seasonality_ts <- function(
     ),
     linewidth = 2
   ) +
-    scale_x_date(date_labels = "%b", breaks = month_labels, expand = c(0, 0)) +
+    scale_x_date(date_labels = c("J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"), breaks = month_labels, expand = c(0, 0)) +
     labs(
       title = paste("30-day Moving Average", value_name, bsn, info_text),
       subtitle = subtitle_text,
       x = "Month",
       y = paste(value_name, value_unit),
-      color = "Dataset",
-      linetype = "Dataset",
+      color = "Scenario",
+      linetype = "Variant",
       fill = paste0(q_bot * 100, "-", q_top * 100, " % Quantile")
     ) +
     custom_theme() +
@@ -188,18 +191,42 @@ plot_seasonality_ts <- function(
       values = plot_info[[line_col]]$linetypes,
       labels = plot_info[[line_col]]$labels
     ) +
-    #ylim(0.2, 0.55) +
+    guides(
+      color = guide_legend(title.position = "top", nrow = 1),
+      linetype = guide_legend(title.position = "top", nrow = 1)
+    ) +
+    ylim(450, 1450) +
     (if (show_range) scale_fill_manual(
       values = plot_info[[color_col]]$colors,
       labels = plot_info[[color_col]]$labels
     ) else NULL)
     
 
-  # Save the plot
-  save_dir <- file.path(plot_dir, "seasonality", info_col)
-  filename <- paste0("seasonality_ts_", bsn, "_", stat, "_", value_col, ifelse(show_ensemble,"ens", ""), ifelse(show_range, paste0("_Q", q_bot*100, "_Q", q_top*100), ""), info_text, ".pdf")
-  save_plot(p, save_dir, filename, width = 18, height = 6)
+  if (save_p) {
+    # Save the plot
+    save_dir <- file.path(plot_dir, "seasonality", info_col)
+    filename <- paste0("seasonality_ts_", bsn, "_", stat, "_", value_col, ifelse(show_ensemble,"ens", ""), ifelse(show_range, paste0("_Q", q_bot*100, "_Q", q_top*100), ""), info_text, ".pdf")
+    save_plot(p, save_dir, filename, width = 18, height = 6)
+  } else {
+    return(p)
+  }
   
+}
+
+combine_seasonality_horizon_plots <- function(plot_list, plot_dir, bsn, stat, value_col, info_text) {
+  combined_plot <- wrap_plots(plot_list, ncol = 2, guides = "collect") &
+    theme(legend.position = "bottom")
+  
+  # Dynamic height
+  n_horizons <- length(plot_list)
+  base_height <- 2
+  total_height <- n_horizons * base_height
+  
+  # Save
+  save_dir <- file.path(plot_dir, "seasonality_horizon", info_col)
+  filename <- paste0("seasonality_ts_horizon_", bsn, "_", stat, "_", value_col, info_text, ".pdf")
+  
+  save_plot(combined_plot, save_dir, filename, width = 18, height = total_height)
 }
 
 plot_seasonality_bars <- function(dt, plot_dir, bsn, info_col, color_col, value_col, stat, info_text) {

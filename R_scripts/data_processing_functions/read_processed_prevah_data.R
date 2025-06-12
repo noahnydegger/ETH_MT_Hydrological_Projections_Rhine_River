@@ -37,18 +37,27 @@ all_run_types <- c(
 run_type_sel <- c("sund_bc", "with_glac_sdbc")
 run_type_sel <- c("bservation", "indcast", "future_V1")
 
+basin_sel <- c("RhB200", "RhD200", "RhN200", "RhR200", "AaU200", "ThS200", "Thu200", "TGl200", "HiR200", "VoR200", "Bod400")  # MT_sel
+station_sel <- c("Basel Rheinhalle", "Diepoldsau", "Rhine_Neuhausen", "Rekingen", "Aare_Untersiggenthal", 
+               "Aare_Thun", "Luetschine_Gsteig",
+               "Andelfingen", "Thur_Halden",
+               "Toess_Neftenbach", "Glatt_Rheinsfelden",
+               "Hinterrhein_Fuerstenau", "Vorderrhein_Ilanz", "Rhine_Domat_Ems", "Gisingen", "Rhine_Rheinfelden", 
+               "Brugg", "Bruegg-Aegerten", "Aare_Murgenthal", "Aare_Schoenau", 
+               "Limmatt_Baden", "Mellingen", "Reuss_Seedorf")  # MT_sel
+
 # To include all .rds files without filtering, uncomment the lines below:
 # scenario_horizons <- character(0)
 # run_type_sel <- character(0)
 
 knmi_variables <- list(
-  knmi_mit_output_dt = list(read = FALSE, read_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "prevah_mit_output_knmi.rds"),
+  knmi_mit_output_dt = list(read = FALSE, read_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "prevah_mit_output_future_V1_MT_sel.rds"),
                             combine = FALSE, combine_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "mit_output")),
  
-  knmi_meteo_stat_dt = list(read = FALSE, read_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "prevah_meteo_stat_knmi.rds"),
+  knmi_meteo_stat_dt = list(read = FALSE, read_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "prevah_meteo_stat_future_V1_MT_sel.rds"),
                             combine = FALSE, combine_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "meteo_stat")),
   
-  knmi_discharge_dt = list(read = FALSE, read_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "prevah_discharge_knmi.rds"),
+  knmi_discharge_dt = list(read = FALSE, read_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "prevah_discharge_knmi_future_V1_MT_sel.rds"),
                            combine = TRUE, combine_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "discharge")),
   
   knmi_discharge_dt_rblick = list(read = FALSE, read_dir = "path/to/discharge_data.rds")
@@ -110,11 +119,46 @@ combine_rds_scenario_data <- function(var_list) {
       next
     }
     
-    # Read and combine all RDS files
-    combined_dt <- data.table::rbindlist(
-      lapply(rds_files, readRDS), 
-      use.names = TRUE, fill = TRUE
-    )
+    message("Processing variable '", varname, "' with ", length(rds_files), " files...")
+    
+    # Batching parameters
+    batch_size <- 3
+    batch_starts <- seq(1, length(rds_files), by = batch_size)
+    
+    batch_list <- list()
+    batch_idx <- 1
+    
+    # Process batches
+    for (batch_start in batch_starts) {
+      batch_end <- min(batch_start + batch_size - 1, length(rds_files))
+      batch_files <- rds_files[batch_start:batch_end]
+      
+      message("  Processing batch ", batch_idx, " of ", length(batch_starts), 
+              " (", length(batch_files), " files)...")
+      
+      batch_dt <- data.table::rbindlist(lapply(batch_files, readRDS), use.names = TRUE, fill = TRUE)
+      
+      # Filter for desired basins
+      if ("basin" %in% names(batch_dt)) {
+        batch_dt <- batch_dt[basin %in% basin_sel]
+      } else if ("station" %in% names(batch_dt)) {
+        batch_dt <- batch_dt[station %in% station_sel]
+      } else {
+        warning("Column 'basin' not found in batch ", batch_idx, " — skipping filtering.")
+      }
+      
+      batch_list[[batch_idx]] <- batch_dt
+      batch_idx <- batch_idx + 1
+      
+      rm(batch_dt)
+      gc()
+    }
+    
+    # Final rbindlist — this is fast + memory efficient
+    combined_dt <- data.table::rbindlist(batch_list, use.names = TRUE, fill = TRUE)
+    
+    rm(batch_list)
+    gc()
     
     # Order the combined data
     if ("basin" %in% colnames(combined_dt)) {
@@ -129,6 +173,14 @@ combine_rds_scenario_data <- function(var_list) {
     assign(varname, combined_dt, envir = .GlobalEnv)
     
     message("Combined data '", varname, "'")
+    
+    saveRDS(combined_dt, file = read_dir)
+    
+    # Also save as CSV (same base name, .csv extension)
+    csv_path <- sub("\\.rds$", ".csv", read_dir)
+    data.table::fwrite(combined_dt, file = csv_path)
+    
+    message("Saved combined '", varname, "' to: ", read_dir)
     
     # Save as RDS only if no filtering was applied
     if (length(scenario_horizons) == 0 && length(run_type_sel) == 0) {

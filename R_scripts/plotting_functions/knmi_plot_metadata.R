@@ -186,7 +186,7 @@ plot_info <- list(
     labels = c(
       "none_observation" = "Observation",
       "none_hindcast" = "Hindcast",
-      "none_ref" = "Reference",
+      "none_ref" = "KNMI Reference",
       "L_2033" = "L 2033",
       "L_2100" = "L 2100",
       "M_2050" = "M 2050",

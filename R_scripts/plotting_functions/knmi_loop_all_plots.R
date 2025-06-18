@@ -14,12 +14,12 @@ info_text = ""
 dataset <- "discharge"
 
 plot_selection <- c(
-  "seasonality" = TRUE,
+  "seasonality" = FALSE,
   "seasonality_horizon" = TRUE,
   "annual_boxplot" = FALSE,
   "annual_horizon_boxplot" = FALSE,
   "seasonal_boxplot" = FALSE,
-  "monthly_boxplot" = FALSE,
+  "monthly_boxplot" = TRUE,
   "pdf_cdf" = FALSE,
   "duration_curve" = FALSE,
   "initial_condition" = FALSE
@@ -34,7 +34,7 @@ plot_dataset <- c(
 period_sel <- c("simulation") # or warmup
 
 # if empty c() plot all basins
-basin_sel <- c("RhB200")#, "Rhb200") #, "Bod400", "HiR200", "LaP200", "VoR200" ) #, "RhB200", "RhD200", "RhN200", "RhR200", "Rhb200", "HiR200", "LaP200", "VoR200" , "Thu200"
+basin_sel <- c("ThS200")# c("RhB200", "RhD200", "RhN200", "RhR200", "AaU200", "ThS200", "Thu200", "TGl200", "HiR200", "VoR200", "Bod400")
 
 scen_var_hor_sel <- c("none_none_observation", "none_none_hindcast", "none_none_ref",
                       "L_none_2033",
@@ -47,8 +47,9 @@ scen_var_hor_sel <- c("none_none_observation", "none_none_hindcast", "none_none_
                       "H_wet_2150", "H_dry_2150"
                       )
 horizon_sel <- c("ref", "2033", "2050", "2100", "2150")
+horizon_sel <- c("observation", "hindcast", "ref")
 
-run_type_sel <- c("future_V1")
+run_type_sel <- c("future_V1", "hindcast", "observation")
 
 hydro_model_sel <- c("observation" ,"PREVAH") #, "wflow_sbm", "larsim", "PREVAH")
 
@@ -58,11 +59,11 @@ line_col <- "variant"
 line_col_levels <- c("none", "wet", "dry")
 comparison_ref = "none_none"
 
-#color_col <- "scen_hor"
-#color_col_levels <- c("none_ref", "L_2033", "M_2050", "H_2050", "L_2100", "M_2100", "H_2100", "M_2150", "H_2150")
+color_col <- "scen_hor"
+color_col_levels <- c("none_observation", "none_hindcast", "none_ref")#, "L_2033", "M_2050", "H_2050", "L_2100", "M_2100", "H_2100", "M_2150", "H_2150")
 
-color_col <- "scenario"
-color_col_levels <- c("none", "L", "M", "H")
+#color_col <- "scenario"
+#color_col_levels <- c("none", "L", "M", "H")
 #scen_var_hor_sel <- c("none_none_ref", "L_none_2033", "H_wet_2150", "H_dry_2150")
 
 if (dataset == "mit_output") {
@@ -70,7 +71,7 @@ if (dataset == "mit_output") {
   dt_dataset <- knmi_mit_output_dt
   
 } else if (dataset == "meteo_stat") {
-  value_cols <- c("tair_avg", "tair_min", "tair_max", "prec_avg", "sund_avg", "radg_avg") #"tair_max", 
+  value_cols <- c("tair_avg")#, "prec_avg")#, "tair_min", "tair_max", "sund_avg", "radg_avg") #"tair_max", 
   dt_dataset <- knmi_meteo_stat_dt
   
 } else if (dataset == "discharge") {
@@ -221,8 +222,9 @@ if (plot_selection["annual_horizon_boxplot"]) {
         dt_annual <- compute_annual_or_seasonal(dt, value_col, group_cols, statistic = stat, seasonal = FALSE)
         dt_diff <- compute_member_differences(dt, value_col, group_cols, linking_cols, comparison_col = color_col, comparison_ref = comparison_ref, stat)
 
-        plot_annual_horizon_boxplots(dt_annual, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text, rel = FALSE)
-        plot_annual_horizon_boxplots(dt_diff, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text, rel = TRUE)
+        #plot_annual_horizon_boxplots(dt_annual, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text, rel = FALSE)
+        #plot_annual_horizon_boxplots(dt_diff, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text, rel = TRUE)
+        plot_annual_horizon_boxplots(dt_diff, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text, abs = TRUE)
       } # stat loop
     } # column loop
   } # basin loop
@@ -265,14 +267,15 @@ if (plot_selection["monthly_boxplot"]) {
   
   source(here("R_scripts", "plotting_functions", "plot_boxplots.R"))
   
-  group_cols <- c("basin", "scen_var", "scen_var_hor", "hydro_model", "run_type")
+  group_cols <- c("basin", "scen_var", "scen_hor", "scen_var_hor", "hydro_model", "run_type")
   linking_cols <- c("basin", "run_type")
   
-  statistics <- c("mean", "min", "max", "7day_low")
+  statistics <- c("mean")#, "min", "max", "7day_low")
   
   # generate annual boxplots
   for (bsn in basin_sel) {
     dt <- dt_subset[basin == bsn]
+    dt[, scen_hor := interaction(as.character(scenario), as.character(horizon), sep = "_")]
     for (value_col in value_cols) {
       if (all(is.na(dt[[value_col]]))) next
       for (stat in statistics) {
@@ -281,15 +284,11 @@ if (plot_selection["monthly_boxplot"]) {
         dt_month <- compute_annual_or_seasonal(dt, value_col, group_cols, statistic = stat, monthly = TRUE)
         dt_year <- compute_annual_or_seasonal(dt, value_col, group_cols, statistic = stat)
         
-        stat_col <- paste0(value_col, "_", stat)
-        dt_month_rel <- compute_relative_mean(dt_month, stat_col, color_col, comparison_ref, monthly = TRUE)
-        dt_year_rel <- compute_relative_mean(dt_year, stat_col, color_col, comparison_ref)
-        
-        dt_month_diff <- compute_member_differences(dt, value_col, group_cols, linking_cols, comparison_col = color_col, comparison_ref = comparison_ref, stat, monthly = TRUE)
-        dt_year_diff <- compute_member_differences(dt, value_col, group_cols, linking_cols, comparison_col = color_col, comparison_ref = comparison_ref, stat)
+        #dt_month_diff <- compute_member_differences(dt, value_col, group_cols, linking_cols, comparison_col = color_col, comparison_ref = comparison_ref, stat, monthly = TRUE)
+        #dt_year_diff <- compute_member_differences(dt, value_col, group_cols, linking_cols, comparison_col = color_col, comparison_ref = comparison_ref, stat)
         
         plot_month_year_boxplots(dt_month, dt_year, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text, rel = FALSE)
-        plot_month_year_boxplots(dt_month_diff, dt_year_diff, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text, rel = TRUE)
+        #plot_month_year_boxplots(dt_month_diff, dt_year_diff, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text, rel = TRUE)
       } # stat loop
     } # column loop
   } # basin loop

@@ -209,7 +209,7 @@ plot_annual_boxplots <- function(dt_annual, plot_dir, bsn, color_col, color_col_
   
 }
 
-plot_annual_horizon_boxplots <- function(dt_annual, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text = "", rel = FALSE) {
+plot_annual_horizon_boxplots <- function(dt_annual, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text = "", rel = FALSE, abs = FALSE) {
   
   value_name <- plot_info$column_info$names[[value_col]]
   value_unit <- plot_info$column_info$units[[value_col]]
@@ -223,6 +223,13 @@ plot_annual_horizon_boxplots <- function(dt_annual, plot_dir, bsn, color_col, co
     info_text <- paste0(info_text, "change")
     value_unit <- "[%]"
     y_text <- "Change [%]"
+  }
+  
+  if (abs) {
+    stat_col <- paste0(stat_col, "_abs_diff")
+    info_text <- paste0(info_text, " change")
+    value_unit <- value_unit
+    y_text <- paste("Change", value_unit)
   }
   
   dt_annual[, (color_col) := factor(get(color_col), levels = color_col_levels)]
@@ -242,7 +249,7 @@ plot_annual_horizon_boxplots <- function(dt_annual, plot_dir, bsn, color_col, co
     geom_boxplot(width = 0.6, outlier.size = 0.5) +
     facet_grid(~ horizon, scales = "free_x", space = "free_x", switch = "x") +
     labs(
-      title = paste("Annual", stat, value_name, bsn, info_text),
+      title = NULL,# paste("Annual", stat, value_name, bsn, info_text),
       x = NULL,
       y = y_text,
       fill = NULL
@@ -264,6 +271,7 @@ plot_annual_horizon_boxplots <- function(dt_annual, plot_dir, bsn, color_col, co
       fill = guide_legend(nrow = 1),
       color = guide_legend(nrow = 1)
     ) +
+    ylim(0, 8) +
     scale_fill_manual(
       values = plot_info[[color_col]]$colors,
       labels = plot_info[[color_col]]$labels
@@ -396,20 +404,25 @@ plot_month_year_boxplots <- function(dt_month, dt_year, plot_dir, bsn, color_col
       size = 0.8
     ) +
     labs(
-      title = paste(stat, value_name, bsn, info_text),
+      title = NULL,# paste(stat, value_name, bsn, info_text),
       x = "Month",
       y = y_text,
-      fill = "Dataset"
+      fill = ""
     ) +
     custom_theme() +
     theme(
+      legend.position = "top",
       axis.title.x = element_blank()  # Remove the x-axis title
     ) +
     scale_x_discrete() +
     scale_fill_manual(
       values = plot_info[[color_col]]$colors,
       labels = plot_info[[color_col]]$labels
+    ) +
+    guides(
+      fill = guide_legend(nrow = 1)
     )
+  
   # Add yearly boxplot
   p <- p +
     geom_boxplot(

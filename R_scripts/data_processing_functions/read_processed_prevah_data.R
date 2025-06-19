@@ -57,8 +57,8 @@ knmi_variables <- list(
   knmi_meteo_stat_dt = list(read = FALSE, read_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "prevah_meteo_stat_future_V1_MT_sel.rds"),
                             combine = FALSE, combine_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "meteo_stat")),
   
-  knmi_discharge_dt = list(read = FALSE, read_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "prevah_discharge_knmi_future_V1_MT_sel.rds"),
-                           combine = TRUE, combine_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "discharge")),
+  knmi_discharge_dt = list(read = TRUE, read_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "prevah_discharge_knmi_future_V1_MT_sel.rds"),
+                           combine = FALSE, combine_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "discharge")),
   
   knmi_discharge_dt_rblick = list(read = FALSE, read_dir = "path/to/discharge_data.rds")
 )

@@ -7,8 +7,8 @@ REMOTE_BASE="/storage/HyVBigData/KNMI23_data/KNMI_cutproj/netcdf_processed"
 LOCAL_BASE="/Volumes/MT_case_sensitive/ETH_MT_Hydrological_Projections_Rhine_River/Data/Rheinblick2027/meteo/netcdf_processed"
 
 # Define the list of variables and corresponding local folders
-VARIABLES=("tas" "pr")
-LOCAL_FOLDERS=("temperature" "precipitation")
+VARIABLES=("pr")
+LOCAL_FOLDERS=("precipitation")
 
 # Define file suffix
 SUFFIX=".nc"

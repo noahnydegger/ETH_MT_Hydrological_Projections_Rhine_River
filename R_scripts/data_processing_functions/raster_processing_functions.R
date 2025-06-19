@@ -408,12 +408,6 @@ knmi_ext_vec <- as.vector(ext(knmi_rast))
 
 center_lat <- get_center_lat_from_raster(rhine_bsn_shp)
 
-terraOptions(
-  progress = 1,                  # show progress
-  memfrac = 0.8,                 # use up to 80% of available memory
-  tempdir = tempdir()          # ensure it uses a fast local temp
-)
-
 
 compare_rasters <- function(r1, r2, r3) {
   cat("----- EXTENT COMPARISON -----\n")
@@ -450,4 +444,4 @@ compare_rasters <- function(r1, r2, r3) {
 }
 
 # Run comparison
-compare_rasters(knmi_rast_crop, hind_rast_res, ref_rast)
+#compare_rasters(knmi_rast_crop, hind_rast_res, ref_rast)

@@ -136,7 +136,7 @@ plot_info <- list(
     ),
     labels = c(
       "none_none" = "Reference",
-      "L_none" = "L 2033",
+      "L_none" = "L 1.5°C",
       "L_dry" = "L dry",
       "L_wet" = "L wet",
       "M_dry" = "M dry",
@@ -187,7 +187,7 @@ plot_info <- list(
       "none_observation" = "Observation",
       "none_hindcast" = "Hindcast",
       "none_ref" = "KNMI Reference",
-      "L_2033" = "L 2033",
+      "L_2033" = "L 1.5°C",
       "L_2100" = "L 2100",
       "M_2050" = "M 2050",
       "M_2100" = "M 2100",
@@ -261,7 +261,7 @@ plot_info <- list(
       "none_none_observation" = "Observation",
       "none_none_hindcast" = "Hindcast",
       "none_none_ref" = "Reference",
-      "L_none_2033" = "L 2033",
+      "L_none_2033" = "L 1.5°C",
       "L_dry_2100" = "L dry 2100",
       "L_wet_2100" = "L wet 2100",
       "M_dry_2050" = "M dry 2050",
@@ -345,12 +345,12 @@ plot_info <- list(
       # meteo stats file
       "tair_min" = "air temperature (min)",
       "tair_max" = "air temperature (max)",
-      "tair_avg" = "air temperature (avg)",
+      "tair_avg" = "temperature",
       "tair_std" = "air temperature (std)",
       
       "prec_min" = "precipitation (min)",
       "prec_max" = "precipitation (max)",
-      "prec_avg" = "precipitation (avg)",
+      "prec_avg" = "precipitation",
       "prec_std" = "precipitation (std)",
       
       "radg_min" = "global radiation (min)",

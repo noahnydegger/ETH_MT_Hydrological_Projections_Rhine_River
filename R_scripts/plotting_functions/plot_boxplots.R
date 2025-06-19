@@ -209,7 +209,7 @@ plot_annual_boxplots <- function(dt_annual, plot_dir, bsn, color_col, color_col_
   
 }
 
-plot_annual_horizon_boxplots <- function(dt_annual, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text = "", rel = FALSE, abs = FALSE) {
+plot_annual_horizon_boxplots <- function(dt_annual, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text = "", y_lim = NULL, rel = FALSE, abs = FALSE) {
   
   value_name <- plot_info$column_info$names[[value_col]]
   value_unit <- plot_info$column_info$units[[value_col]]
@@ -222,14 +222,14 @@ plot_annual_horizon_boxplots <- function(dt_annual, plot_dir, bsn, color_col, co
     stat_col <- paste0(stat_col, "_rel_diff")
     info_text <- paste0(info_text, "change")
     value_unit <- "[%]"
-    y_text <- "Change [%]"
+    y_text <- paste("change in", value_name, "[%]")
   }
   
   if (abs) {
     stat_col <- paste0(stat_col, "_abs_diff")
     info_text <- paste0(info_text, " change")
     value_unit <- value_unit
-    y_text <- paste("Change", value_unit)
+    y_text <- paste("change in", value_name, value_unit)
   }
   
   dt_annual[, (color_col) := factor(get(color_col), levels = color_col_levels)]
@@ -271,7 +271,8 @@ plot_annual_horizon_boxplots <- function(dt_annual, plot_dir, bsn, color_col, co
       fill = guide_legend(nrow = 1),
       color = guide_legend(nrow = 1)
     ) +
-    ylim(0, 8) +
+    (if (!is.null(y_lim)) 
+      ylim(y_lim) else NULL) +
     scale_fill_manual(
       values = plot_info[[color_col]]$colors,
       labels = plot_info[[color_col]]$labels
@@ -308,7 +309,7 @@ plot_annual_horizon_boxplots <- function(dt_annual, plot_dir, bsn, color_col, co
   # Save the plot
   save_dir <- file.path(plot_dir, "annual_horizon_boxplots", value_col)
   filename <- paste0("annual_horizon_", bsn, "_", stat_col, info_text, ".pdf")
-  save_plot(p, save_dir, filename, width = 12, height = 6)
+  save_plot(p, save_dir, filename, width = 9, height = 6)
   
 }
 

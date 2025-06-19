@@ -5,21 +5,22 @@ home_dir <-file.path(here::here())
 
 plot_dir <- file.path(home_dir, "Plots", "Reference_Period_Analysis", "glacier_scenarios", "glac_sdbc")
 plot_dir <- file.path(home_dir, "Plots", "Reference_Period_Analysis", "2inter_meeting", "H_wet")
-plot_dir <- file.path(home_dir, "Plots", "future_V1", "rel_changes")
+plot_dir <- file.path(home_dir, "Plots", "future_V1", "days_per_year")
 
 info_text = ""
 #info_text = "sund_bc"
   
-# select the dataset to plot: mit_output, meteo_stat, discharge
+# select the dataset to plot: mit_output, meteo_stat, discharge, meteo_input
 dataset <- "discharge"
 
 plot_selection <- c(
   "seasonality" = FALSE,
-  "seasonality_horizon" = TRUE,
+  "seasonality_horizon" = FALSE,
   "annual_boxplot" = FALSE,
   "annual_horizon_boxplot" = FALSE,
   "seasonal_boxplot" = FALSE,
-  "monthly_boxplot" = TRUE,
+  "monthly_boxplot" = FALSE,
+  "seasonal_bar" = TRUE,
   "pdf_cdf" = FALSE,
   "duration_curve" = FALSE,
   "initial_condition" = FALSE
@@ -46,12 +47,12 @@ scen_var_hor_sel <- c("none_none_observation", "none_none_hindcast", "none_none_
                       "M_wet_2150", "M_dry_2150",
                       "H_wet_2150", "H_dry_2150"
                       )
-horizon_sel <- c("ref", "2033", "2050", "2100", "2150")
-horizon_sel <- c("observation", "hindcast", "ref")
+horizon_sel <- c("ref", "2050", "2100", "2150")
+#horizon_sel <- c("observation", "hindcast", "ref")
 
 run_type_sel <- c("future_V1", "hindcast", "observation")
 
-hydro_model_sel <- c("observation" ,"PREVAH") #, "wflow_sbm", "larsim", "PREVAH")
+hydro_model_sel <- c("none","observation" ,"PREVAH") #, "wflow_sbm", "larsim", "PREVAH")
 
 color_col <- "scen_var"
 color_col_levels <- c("none_none","L_none", "L_wet", "L_dry", "M_wet", "M_dry", "H_wet", "H_dry")
@@ -59,8 +60,8 @@ line_col <- "variant"
 line_col_levels <- c("none", "wet", "dry")
 comparison_ref = "none_none"
 
-color_col <- "scen_hor"
-color_col_levels <- c("none_observation", "none_hindcast", "none_ref")#, "L_2033", "M_2050", "H_2050", "L_2100", "M_2100", "H_2100", "M_2150", "H_2150")
+#color_col <- "scen_hor"
+#color_col_levels <- c("none_observation", "none_hindcast", "none_ref")#, "L_2033", "M_2050", "H_2050", "L_2100", "M_2100", "H_2100", "M_2150", "H_2150")
 
 #color_col <- "scenario"
 #color_col_levels <- c("none", "L", "M", "H")
@@ -80,6 +81,11 @@ if (dataset == "mit_output") {
   value_cols <- c("discharge")
   dt_dataset <- knmi_discharge_dt
   setnames(dt_dataset, old = "station", new = "basin", skip_absent = TRUE)
+  
+} else if (dataset == "meteo_input") {
+  basin_sel <- c("RhB200")
+  value_cols <- c("prec_avg")#"tair_avg")#, "prec_avg") #"prec_avg")#
+  dt_dataset <- knmi_meteo_input_dt
   
 } else {
   stop("Unknown dataset")
@@ -222,9 +228,9 @@ if (plot_selection["annual_horizon_boxplot"]) {
         dt_annual <- compute_annual_or_seasonal(dt, value_col, group_cols, statistic = stat, seasonal = FALSE)
         dt_diff <- compute_member_differences(dt, value_col, group_cols, linking_cols, comparison_col = color_col, comparison_ref = comparison_ref, stat)
 
-        #plot_annual_horizon_boxplots(dt_annual, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text, rel = FALSE)
-        #plot_annual_horizon_boxplots(dt_diff, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text, rel = TRUE)
-        plot_annual_horizon_boxplots(dt_diff, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text, abs = TRUE)
+        plot_annual_horizon_boxplots(dt_annual, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text, rel = FALSE)
+        plot_annual_horizon_boxplots(dt_diff, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text, rel = TRUE)
+        plot_annual_horizon_boxplots(dt_diff, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text, y_lim = NULL, abs = TRUE)
       } # stat loop
     } # column loop
   } # basin loop
@@ -293,6 +299,33 @@ if (plot_selection["monthly_boxplot"]) {
     } # column loop
   } # basin loop
 } # seasonal boxplot plot
+
+# seasonal bar extreme plot ------------------------------------------------------
+if (plot_selection["seasonal_bar"]) {
+  
+  source(here("R_scripts", "plotting_functions", "plot_bar_extremes.R"))
+  
+  group_cols <- c("basin", "scen_var", "scen_var_hor", "hydro_model", "run_type")
+  
+  comparison_col <- "scen_var_hor"
+  comparison_ref <- "none_none_observation"
+  
+  q_bot <- 0.25
+  q_top <- 0.95
+  
+  # generate annual boxplots
+  for (bsn in basin_sel) {
+    dt <- dt_subset[basin == bsn & scenario %in% c("none", "H")]
+    for (value_col in value_cols) {
+      if (all(is.na(dt[[value_col]]))) next
+      cat("Plotting seasonal bar plot for", bsn, value_col, "\n")
+      
+      dt_dpy <- compute_number_of_days(dt, bsn, group_cols, value_col, comparison_col, comparison_ref, q_bot, q_top)
+      
+      plot_seasonal_bars_with_error(dt_dpy, plot_dir, bsn, color_col, color_col_levels, value_col, group_cols, info_text = info_text, rel = FALSE)
+    } # column loop
+  } # basin loop
+} # seasonal bar plot
 
 # pdf & cdf plot -----------------------------------------------------------
 if (plot_selection["pdf_cdf"]) {

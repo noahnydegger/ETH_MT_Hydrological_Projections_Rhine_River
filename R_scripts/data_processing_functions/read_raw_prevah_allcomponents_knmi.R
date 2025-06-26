@@ -1,6 +1,8 @@
 library(here)
 library(data.table)
 
+# settings --------------------------------------------------
+
 # project directory
 home_dir <- file.path(here::here())
 
@@ -31,9 +33,11 @@ all_scenario_horizons <- c(
 )
 
 scenario_horizons <- c(
-  "Hd_2050",
-  "L_2033",
-  "Md_2150", "Mn_2150"
+  "Hd_2100", "Hd_2150",
+  "Hn_2050", "Hn_2100", "Hn_2150",
+  "Md_2050", "Md_2100", "Md_2150",
+  "Mn_2050", "Mn_2100", "Mn_2150",
+  "Ld_2100", "Ln_2100"
 )
 read_hindcast <- FALSE
 
@@ -97,7 +101,7 @@ process_mit_data <- function(data_file, horizon, scenario, variant, member, ezg,
     prevah_date_cols <- c("YYYY", "MM", "DD")
     prevah_general_cols <- c("basin")
     rblick_date_cols <- c("date")
-    rblick_cols <- c("horizon", "scenario", "variant", "member", "scen_var", "scen_var_hor", "period", "run_type", "hydro_model", "source")
+    rblick_cols <- c("horizon", "scenario", "variant", "member", "scen_var", "scen_hor", "scen_var_hor", "period", "run_type", "hydro_model", "source")
     
     non_value_col <- c(prevah_date_cols, prevah_general_cols, rblick_date_cols, rblick_cols)
     
@@ -174,7 +178,7 @@ process_meteo_stats_data <- function(ezg_dir, meteo_variables, meteo_stat_file_s
   prevah_date_cols <- c("YYYY", "MM", "DD")
   prevah_general_cols <- c("basin")
   rblick_date_cols <- c("date")
-  rblick_cols <- c("horizon", "scenario", "variant", "member", "scen_var", "scen_var_hor", "period", "run_type", "hydro_model", "source")
+  rblick_cols <- c("horizon", "scenario", "variant", "member", "scen_var", "scen_hor", "scen_var_hor", "period", "run_type", "hydro_model", "source")
   
   non_value_col <- c(prevah_date_cols, prevah_general_cols, rblick_date_cols, rblick_cols)
   
@@ -191,33 +195,8 @@ process_meteo_stats_data <- function(ezg_dir, meteo_variables, meteo_stat_file_s
 # Function to add 'scenario_variant' and 'scenario_variant_horizon' columns with custom ordering
 add_scenario_horizon_grouping_columns <- function(dt) {
   dt[, scen_var := paste(scenario, variant, sep = "_")]
+  dt[, scen_hor := paste(scenario, horizon, sep = "_")]
   dt[, scen_var_hor := paste(scen_var, horizon, sep = "_")]
-  
-  # Define custom order for scenario
-  scenario_order <- c("H", "M", "L", "none")
-  
-  # Define custom order for scen_var (including the variants: dry, wet, none)
-  scen_var_order <- c(
-    "H_dry", "H_wet", "M_dry", "M_wet", "L_dry", "L_wet",
-    "L_none", "none_none"
-  )
-  
-  # Define custom order for scen_var_hor (with horizon)
-  scen_var_hor_order <- c(
-    "H_dry_2150", "H_dry_2100", "H_dry_2050", 
-    "H_wet_2150", "H_wet_2100", "H_wet_2050", 
-    "M_dry_2150", "M_dry_2100", "M_dry_2050", 
-    "M_wet_2150", "M_wet_2100", "M_wet_2050", 
-    "L_dry_2100",
-    "L_wet_2100",
-    "L_none_2033",
-    "none_none_ref", "none_none_hindcast", "none_none_observation"
-  )
-  
-  # Convert scen_var and scen_var_hor to factors with defined levels
-  dt[, scenario := factor(scenario, levels = scenario_order)]
-  dt[, scen_var := factor(scen_var, levels = scen_var_order)]
-  dt[, scen_var_hor := factor(scen_var_hor, levels = scen_var_hor_order)]
   
   return(dt)
 }
@@ -300,7 +279,7 @@ for (scen in scenario_horizons) {
   scenario_meteo_stat_list <- list()
   
   if (scen == "reference") {
-    scenario <- "none"
+    scenario <- "ref"
     horizon <- "ref"
   } else {
     scenario <- substr(scen, 1, 1)
@@ -311,7 +290,11 @@ for (scen in scenario_horizons) {
   variant <- ifelse(nchar(scen) >= 2 & substr(scen, 2, 2) == "d", 
                     "dry", 
                     ifelse(substr(scen, 2, 2) == "n", "wet", 
-                           "none"))
+                           "ref"))
+  
+  if (scen == "L_2033") {
+    variant <- "Paris"
+  }
   
   # Loop over matching folders
   for (scen_ensm_dir in matching_folders) {
@@ -370,8 +353,8 @@ if (read_hindcast) {
   # hindcast data
   cat("Processing hindcast data\n")
   horizon <- "hindcast"
-  scenario <- "none" # for control run
-  variant <- "none"
+  scenario <- "hindcast" # for control run
+  variant <- "hindcast"
   member <- "none"
   run_type_hind <- "hindcast"
   
@@ -397,7 +380,7 @@ if (read_hindcast) {
     
     if (!(ezg %in% no_meteo_gebiete)) {
       # Process meteo statistics data
-      all_meteo_data_dt <- process_meteo_stats_data(ezg_dir, meteo_variables_hind, meteo_stat_file_suffix_hind, "observation", scenario, variant, member, ezg, "observation")
+      all_meteo_data_dt <- process_meteo_stats_data(ezg_dir, meteo_variables_hind, meteo_stat_file_suffix_hind, "observation", "observation", "observation", member, ezg, "observation")
       
       # Create a named vector for mapping
       replacement_map <- setNames(meteo_variables_knmi, meteo_variables_hind)

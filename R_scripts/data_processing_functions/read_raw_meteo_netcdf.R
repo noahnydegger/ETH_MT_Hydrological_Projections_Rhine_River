@@ -105,7 +105,6 @@ crop_and_export <- function(
     ens_match <- regmatches(file, regexpr("ens\\d+", file))
     ensemble <- if (length(ens_match) == 0 || ens_match == "") "none" else ens_match
     
-    cat("[", format(Sys.time(), "%H:%M:%S"), "] export ", basename(file), "_bc \n")
     # Export corrected raster
     export_to_netcdf(
       r_stack = r_crop,
@@ -214,33 +213,29 @@ compute_stats_parallel <- function(
 # Function to add 'scenario_variant' and 'scenario_variant_horizon' columns with custom ordering
 add_scenario_horizon_grouping_columns <- function(dt) {
   dt[, scen_var := paste(scenario, variant, sep = "_")]
+  dt[, scen_hor := paste(scenario, horizon, sep = "_")]
   dt[, scen_var_hor := paste(scen_var, horizon, sep = "_")]
   
-  # Define custom order for scenario
-  scenario_order <- c("H", "M", "L", "none")
+  return(dt)
+}
+
+add_time_period_column <- function(dt, date_col = "date", horizon_col = "horizon", default_horizon = 2005) {
+  # Get the numeric year from the date column
+  dt[, year := as.numeric(format(get(date_col), "%Y"))]
   
-  # Define custom order for scen_var (including the variants: dry, wet, none)
-  scen_var_order <- c(
-    "H_dry", "H_wet", "M_dry", "M_wet", "L_dry", "L_wet",
-    "L_none", "none_none"
-  )
+  # Convert horizon to numeric and use default if conversion fails
+  vals <- dt[[horizon_col]]
+  dt[, horizon_num := ifelse(grepl("^[0-9]{4}$", vals), as.integer(vals), default_horizon)]
   
-  # Define custom order for scen_var_hor (with horizon)
-  scen_var_hor_order <- c(
-    "H_dry_2150", "H_dry_2100", "H_dry_2050", 
-    "H_wet_2150", "H_wet_2100", "H_wet_2050", 
-    "M_dry_2150", "M_dry_2100", "M_dry_2050", 
-    "M_wet_2150", "M_wet_2100", "M_wet_2050", 
-    "L_dry_2100",
-    "L_wet_2100",
-    "L_none_2033",
-    "none_none_ref", "none_none_hindcast", "none_none_observation"
-  )
+  # Classify period
+  dt[, period := ifelse(
+    year >= horizon_num - 14 & year <= horizon_num + 15,
+    "simulation",
+    "warmup"
+  )]
   
-  # Convert scen_var and scen_var_hor to factors with defined levels
-  dt[, scenario := factor(scenario, levels = scenario_order)]
-  dt[, scen_var := factor(scen_var, levels = scen_var_order)]
-  dt[, scen_var_hor := factor(scen_var_hor, levels = scen_var_hor_order)]
+  # Optional cleanup
+  dt[, c("year", "horizon_num") := NULL]
   
   return(dt)
 }
@@ -336,66 +331,65 @@ for (scen_hor in scenario_horizons) {
 }
 plan(sequential)
 
-# # compute stats ----------------------------
-# message("Processing KNMI scenarios")
-# 
-# scenario <- "Hd_2100"
-# sund_bc_export(
-#   data_dir = file.path(output_dir, scenario, "sund_rel_crop"),
-#   output_dir = output_dir,
-#   scenario = scenario,
-#   pattern = ".*sund_rel_crop.*\\.nc$",
-#   suffix = "_bc"
-# )
-# 
-# # compute mean and bc mean
-# scenario <- "reference"
-# message("[", format(Sys.time(), "%H:%M:%S"), "] computing ", scenario, " stats")
-# reference_sund_stats <- compute_sund_stats_parallel(
-#   data_dir = file.path(output_dir, scenario, "sund_rel_crop"),
-#   scenario = scenario,
-#   pattern = ".*sund_rel_crop.*\\.nc$"
-# )
-# message("[", format(Sys.time(), "%H:%M:%S"), "] stats computed")
-# 
-# reference_sund_stats[, `:=`(
-#   basin = "hydro_CH",
-#   scenario = "none",
-#   variant = "none",
-#   horizon = "ref"
-# )]
-# 
-# reference_sund_stats <- add_scenario_horizon_grouping_columns(reference_sund_stats)
-# 
-# # compute mean and bc mean
-# scenario <- "Hd_2100"
-# message("[", format(Sys.time(), "%H:%M:%S"), "] computing ", scenario, " stats")
-# Hd_2100_sund_stats <- compute_sund_stats_parallel(
-#   data_dir = file.path(output_dir, scenario, "sund_rel_crop"),
-#   scenario = scenario,
-#   pattern = ".*sund_rel_crop.*\\.nc$"
-# )
-# message("[", format(Sys.time(), "%H:%M:%S"), "] stats computed")
-# 
-# Hd_2100_sund_stats[, `:=`(
-#   basin = "hydro_CH",
-#   scenario = "H",
-#   variant = "dry",
-#   horizon = "2100"
-# )]
-# 
-# Hd_2100_sund_stats <- add_scenario_horizon_grouping_columns(Hd_2100_sund_stats)
-# # ----------------------------
-# # Step 4: Compute mean difference
-# # ----------------------------
-# sund_stats_dt <- rbind(hindcast_sund_stats, reference_sund_stats, Hd_2100_sund_stats, use.names = TRUE, fill = FALSE)
-# hindcast_logit_raw_mean <- hindcast_sund_stats[, mean(sund_logit_raw, na.rm = TRUE)]
-# hindcast_logit_res_mean <- hindcast_sund_stats[, mean(sund_logit_res, na.rm = TRUE)]
-# 
-# reference_logit_mean <- reference_sund_stats[, mean(sund_logit_raw, na.rm = TRUE)]
-# 
-# logit_diff_raw <- reference_logit_mean - hindcast_logit_raw_mean
-# logit_diff_res <- reference_logit_mean - hindcast_logit_res_mean
+# combine stats -----------------------------------------------------
+# Helper function to extract variable-specific columns
+get_var_cols <- function(dt, varname) {
+  grep(paste0("^", varname, "_"), names(dt), value = TRUE)
+}
+
+# Initialize merged dataset
+merged_dt <- NULL
+
+for (i in seq_along(var_sel)) {
+  varname <- var_sel[i]
+  
+  # List and read all *_<varname>RhB200_stats.rds files
+  pattern <- paste0(varname, ".*RhB200_stats\\.rds$")
+  files <- list.files(output_dir, pattern = pattern, full.names = TRUE, recursive = TRUE)
+  if (length(files) == 0) stop("No files found for variable: ", varname)
+  
+  dt_list <- lapply(files, readRDS)
+  var_dt <- rbindlist(dt_list, use.names = TRUE)
+  
+  if (i == 1) {
+    # Keep full table for the first variable
+    merged_dt <- var_dt
+  } else {
+    # Only keep var-specific columns plus join keys
+    var_cols <- get_var_cols(var_dt, varname)
+    var_dt <- var_dt[, c("scenario", "variant", "horizon", "member", "date", var_cols), with = FALSE]
+    
+    # Merge with existing
+    merged_dt <- merge(merged_dt, var_dt, by = c("scenario", "variant", "horizon", "member", "date"), all = TRUE, allow.cartesian = FALSE)
+  }
+}
+
+merged_dt[horizon == "ref", variant := "ref"]
+merged_dt[horizon == "ref", scenario := "ref"]
+merged_dt[horizon == 2033, variant := "Paris"]
+
+knmi_meteo_input_dt <- add_scenario_horizon_grouping_columns(merged_dt)
+knmi_meteo_input_dt <- add_time_period_column(knmi_meteo_input_dt)
+
+knmi_meteo_input_dt[, `:=`(
+  run_type  = "future_V1",
+  hydro_model = "none",
+  source = "KNMI"
+)]
+
+setorder(knmi_meteo_input_dt, scen_var_hor, member, date)
+
+# Define output filenames
+output_rds <- file.path(output_dir, "knmi_meteo_input.rds")
+output_csv <- file.path(output_dir, "knmi_meteo_input.csv")
+
+# Save as .rds (binary format)
+saveRDS(knmi_meteo_input_dt, file = output_rds)
+
+# Save as .csv (readable text format)
+fwrite(knmi_meteo_input_dt, file = output_csv)
+
+cat("Exported merged dataset to:\n", output_dir, "\n")
 # 
 # # ----------------------------
 # # Step 5: Create Plots

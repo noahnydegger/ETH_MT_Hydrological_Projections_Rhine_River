@@ -1,6 +1,9 @@
 library(here)
 library(data.table)
 
+
+# settings -----------------------------------------------------------------
+
 # project directory
 home_dir <- file.path(here::here())
 
@@ -16,7 +19,7 @@ all_scenario_horizons <- c(
   "bservation" # upper and lower case
 )
 
-scenario_horizons <- c(
+scenario_horizons <- c( # selected scenarios
   "Hd_2050", "Hd_2100", "Hd_2150",
   "Hn_2050", "Hn_2100", "Hn_2150",
   "Md_2050", "Md_2100", "Md_2150",
@@ -35,7 +38,7 @@ all_run_types <- c(
   "future_V1"
 )
 run_type_sel <- c("sund_bc", "with_glac_sdbc")
-run_type_sel <- c("bservation", "indcast", "future_V1")
+run_type_sel <- c("bservation", "indcast", "future_V1") # selected run types
 
 basin_sel <- c("RhB200", "RhD200", "RhN200", "RhR200", "AaU200", "ThS200", "Thu200", "TGl200", "HiR200", "VoR200", "Bod400")  # MT_sel
 station_sel <- c("Basel Rheinhalle", "Diepoldsau", "Rhine_Neuhausen", "Rekingen", "Aare_Untersiggenthal", 
@@ -57,8 +60,11 @@ knmi_variables <- list(
   knmi_meteo_stat_dt = list(read = FALSE, read_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "prevah_meteo_stat_future_V1_MT_sel.rds"),
                             combine = FALSE, combine_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "meteo_stat")),
   
-  knmi_discharge_dt = list(read = TRUE, read_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "prevah_discharge_knmi_future_V1_MT_sel.rds"),
-                           combine = FALSE, combine_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "discharge")),
+  knmi_discharge_dt = list(read = FALSE, read_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "prevah_discharge_knmi_future_V1_MT_sel.rds"),
+                           combine = TRUE, combine_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "discharge")),
+  
+  knmi_lakelevel_dt = list(read = FALSE, read_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "prevah_lakelevel_knmi_future_V1_MT_sel.rds"),
+                           combine = FALSE, combine_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "lakelevel")),
   
   knmi_discharge_dt_rblick = list(read = FALSE, read_dir = "path/to/discharge_data.rds")
 )
@@ -73,6 +79,7 @@ ch2018_variables <- list(
 )
 
 # functions ----------------------------------------------------------------
+
 read_variables_from_list <- function(var_list) {
   # Loop over each entry in the dictionary
   for (varname in names(var_list)) {
@@ -165,6 +172,8 @@ combine_rds_scenario_data <- function(var_list) {
       data.table::setorder(combined_dt, horizon, scenario, variant, member, basin, date)
     } else if ("station" %in% colnames(combined_dt)) {
       data.table::setorder(combined_dt, horizon, scenario, variant, member, station, date)
+    } else if ("lake" %in% colnames(combined_dt)) {
+      data.table::setorder(combined_dt, horizon, scenario, variant, member, lake, date)
     } else {
       data.table::setorder(combined_dt, horizon, scenario, variant, member, date)
     }

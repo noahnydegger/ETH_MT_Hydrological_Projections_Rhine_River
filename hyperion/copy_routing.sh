@@ -3,7 +3,7 @@
 # === CONFIGURATION ===
 SCENARIO="Hd_2150"        # e.g., reference, rcp85
 ENSEMBLES=$(seq 1 8)        # e.g., 1 2 3 4
-EZG=                      # Set to e.g. "NoW200", or leave empty to copy all
+EZG="RhN200"                      # Set to e.g. "NoW200", or leave empty to copy all
 
 RUN_TYPE="future_V1"
 
@@ -41,7 +41,7 @@ for ENS in $ENSEMBLES; do
             mkdir -p "$LOCAL_PATH"
 
             rsync -avz \
-                --include='*.dat' \
+                --include='Neuhausen200.dat' \
                 --exclude='*' \
                 "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_PATH}" "$LOCAL_PATH"
 

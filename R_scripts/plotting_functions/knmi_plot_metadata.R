@@ -11,7 +11,7 @@ custom_theme <- function() {
       axis.title = element_text(size = 20, face = "bold", color = "black"),
       legend.text = element_text(size = 20, color = "black"),
       legend.title = element_text(size = 20, face = "bold", color = "black"),
-      plot.title = element_text(size = 18, face = "bold", hjust = 0.5, color = "black")
+      plot.title = element_text(size = 20, face = "bold", hjust = 0.5, color = "black")
     )
 }
 
@@ -54,33 +54,47 @@ plot_info <- list(
   ),
   scenario = list(
     colors = c(
+      "observation" = "black",
+      "hindcast" = "grey40",
+      "ref" = "grey50",
       "L" = rgb(0, 52, 102, maxColorValue = 255),     # Deep blue
       "M" = rgb(247, 148, 32, maxColorValue = 255),   # Orange
-      "H" = rgb(153, 0, 2, maxColorValue = 255),       # Deep red
-      "none" = "grey50"
+      "H" = rgb(153, 0, 2, maxColorValue = 255)       # Deep red
     ),
     labels = c(
+      "observation" = "Observation",
+      "hindcast" = "Hindcast",
+      "ref" = "Reference",
       "L" = "Low",
       "M" = "Moderate",
-      "H" = "High",
-      "none" = "Reference"
+      "H" = "High"
+    ),
+    linetypes = c(
+      "observation" = "solid",
+      "hindcast" = "solid",
+      "ref" = "solid",
+      "L" = "dashed",       # Dashed line for L scenario (clear but subtle)
+      "M" = "dotted",       # Dotted line for M scenario (visibly distinct)
+      "H" = "dotdash"       # Dot-dash line for H scenario (distinct)
     )
   ),
   variant = list(
     colors = c(
-      "none" = "black",
+      "ref" = "black",
       "dry" = "blue",
       "wet" = "red"
     ),
     linetypes = c(
-      "none" = "solid",      # Solid line for observations or baseline
+      "ref" = "solid",      # Solid line for observations or baseline
       "dry"  = "dashed",     # Dashed line for dry scenarios (clear but subtle)
-      "wet"  = "dotted"     # Dot-dash line for wet scenarios (visibly distinct)
+      "wet"  = "dotted",     # Dot-dash line for wet scenarios (visibly distinct)
+      "Paris" = "dashed"  # Dashed line for Paris Agreement scenario
     ),
     labels = c(
-      "none" = "Reference",
+      "ref" = "Reference",
       "dry" = "dry",
-      "wet" = "wet"
+      "wet" = "wet",
+      "Paris" = "1.5°C"
     )
   ),
   horizon = list(
@@ -88,10 +102,13 @@ plot_info <- list(
       "observation" = "black",
       "hindcast" = "grey40",
       "ref" = "grey70",
-      "2033" = "#99c2e0"  # L scenario (blue)
+      "2033" = "#99c2e0",  # L scenario (blue)
+      "2050" = "#b1dee7ff",
+      "2100" = "#f8990fff", 
+      "2150" = "#96d776ff"
     ),
     linetypes = c(
-      "none" = "solid",      # Solid line for observations or baseline
+      "ref" = "solid",      # Solid line for observations or baseline
       "dry"  = "dashed",     # Dashed line for dry scenarios (clear but subtle)
       "wet"  = "dotdash"     # Dot-dash line for wet scenarios (visibly distinct)
     ),
@@ -107,11 +124,11 @@ plot_info <- list(
   ),
   scen_var = list(
     colors = c(
-      "none_none" = "grey50",
+      "ref_ref" = "grey50",
       # L scenario (blue)
       "L_dry"  = rgb(20, 70, 130, maxColorValue = 255),      # Deep blue
       "L_wet"  = rgb(102, 153, 204, maxColorValue = 255),   # Lighter blue
-      "L_none" = rgb(153, 194, 230, maxColorValue = 255),    # Light blue
+      "L_Paris" = rgb(153, 194, 230, maxColorValue = 255),    # Light blue
       
       # M scenario (orange)
       "M_dry"  = rgb(247, 148, 32, maxColorValue = 255),    # Orange
@@ -122,9 +139,9 @@ plot_info <- list(
       "H_wet" = rgb(222, 152, 152, maxColorValue = 255)    # Lighter red
     ),
     linetypes = c(
-      "none_none" = "solid",
+      "ref_ref" = "solid",
       # L
-      "L_none" = "dashed",
+      "L_Paris" = "dashed",
       "L_dry"  = "dashed",
       "L_wet"  = "dotted",
       # M
@@ -135,8 +152,8 @@ plot_info <- list(
       "H_wet"  = "dotted"
     ),
     labels = c(
-      "none_none" = "Reference",
-      "L_none" = "L 1.5°C",
+      "ref_ref" = "Reference",
+      "L_Paris" = "L 1.5°C",
       "L_dry" = "L dry",
       "L_wet" = "L wet",
       "M_dry" = "M dry",
@@ -148,9 +165,9 @@ plot_info <- list(
   scen_hor = list(
     colors = c(
       # Observation / hindcast / reference
-      "none_observation" = "black",
-      "none_hindcast"    = "grey40",
-      "none_ref"         = "grey70",
+      "observation_observation" = "black",
+      "hindcast_hindcast"    = "grey40",
+      "ref_ref"         = "grey70",
       
       # L scenario (blue)
       "L_2033" = "#5a8db8",  # slightly lighter than base
@@ -168,9 +185,9 @@ plot_info <- list(
       "H_2150" = "#730001"   # slightly darker
     ),
     linetypes = c(
-      "none_observation" = "solid",
-      "none_hindcast"    = "solid",
-      "none_ref"         = "solid",
+      "observation_observation" = "solid",
+      "hindcast_hindcast"    = "solid",
+      "ref_ref"         = "solid",
       
       "L_2033" = "dashed",  # L scenario (blue)
       "L_2100" = "dashed", #"#66a3d2",
@@ -184,9 +201,9 @@ plot_info <- list(
       "H_2150" = "dashed"  #"#990002"
     ),
     labels = c(
-      "none_observation" = "Observation",
-      "none_hindcast" = "Hindcast",
-      "none_ref" = "KNMI Reference",
+      "observation_observation" = "Observation",
+      "hindcast_hindcast" = "Hindcast",
+      "ref_ref" = "KNMI Reference",
       "L_2033" = "L 1.5°C",
       "L_2100" = "L 2100",
       "M_2050" = "M 2050",
@@ -199,12 +216,12 @@ plot_info <- list(
   ),
   scen_var_hor = list(
     colors = c(
-      "none_none_observation" = "black",      
-      "none_none_hindcast" = "grey40",     
-      "none_none_ref" = "grey70",
+      "observation_observation_observation" = "black",      
+      "hindcast_hindcast_hindcast" = "grey40",     
+      "ref_ref_ref" = "grey70",
       
       # L scenario (blue)
-      "L_none_2033" = "#99c2e0",
+      "L_Paris_2033" = "#99c2e0",
       "L_dry_2100"  = "#2b5580", # "#66a3d2", 
       "L_wet_2100"  = "#66a3d2", #"#80b3d9", #
       
@@ -228,12 +245,12 @@ plot_info <- list(
     ),
     linetypes = c(
       # Observations / references
-      "none_none_observation" = "solid",
-      "none_none_hindcast"    = "solid",
-      "none_none_ref"         = "solid",
+      "observation_observation_observation" = "solid",
+      "hindcast_hindcast_hindcast"    = "solid",
+      "ref_ref_ref"         = "solid",
       
       # L scenario
-      "L_none_2033" = "dashed",
+      "L_Paris_2033" = "dashed",
       "L_dry_2100"  = "dashed",
       "L_wet_2100"  = "dotted",
       
@@ -258,10 +275,10 @@ plot_info <- list(
       "H_wet_2150"  = "dotted"
     ),
     labels = c(
-      "none_none_observation" = "Observation",
-      "none_none_hindcast" = "Hindcast",
-      "none_none_ref" = "Reference",
-      "L_none_2033" = "L 1.5°C",
+      "observation_observation_observation" = "Observation",
+      "hindcast_hindcast_hindcast" = "Hindcast",
+      "ref_ref_ref" = "Reference",
+      "L_Paris_2033" = "L 1.5°C",
       "L_dry_2100" = "L dry 2100",
       "L_wet_2100" = "L wet 2100",
       "M_dry_2050" = "M dry 2050",
@@ -320,7 +337,7 @@ plot_info <- list(
       
       # mit output file
       "P-uk" = "Interpolated precipitation",
-      "P-kor" = "Adjusted interpolated precipitation3",
+      "P-kor" = "Adjusted interpolated precipitation",
       "P-SME" = "Snowmelt",
       "EPOT" = "Potential evapotranspiration",
       "EREA" = "Actual evapotranspiration",

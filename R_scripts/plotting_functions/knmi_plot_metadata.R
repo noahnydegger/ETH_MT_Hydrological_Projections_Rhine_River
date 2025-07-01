@@ -3,15 +3,22 @@ library(ggplot2)
 custom_theme <- function() {
   theme_minimal(base_size = 20) + # every text 20 for presentation slides
     theme(
-      panel.grid.major.x = element_blank(),
-      panel.grid.major.y = element_line(color = "gray90"),
-      panel.grid.minor = element_blank(),
       text = element_text(color = "black"),
       axis.text = element_text(size = 20, color = "black"),
       axis.title = element_text(size = 20, face = "bold", color = "black"),
       legend.text = element_text(size = 20, color = "black"),
       legend.title = element_text(size = 20, face = "bold", color = "black"),
-      plot.title = element_text(size = 20, face = "bold", hjust = 0.5, color = "black")
+      plot.title = element_text(size = 20, face = "bold", hjust = 0.5, color = "black"),
+      
+      legend.key = element_rect(colour = NA, fill = NA),
+      legend.background = element_rect(fill = "transparent", colour = NA),
+      #legend.text = element_text(size = 8),
+      panel.background = element_rect(fill = "white", colour = "grey96"),
+      panel.grid.major = element_line(size = 0.2, linetype = 'dotted', colour = "grey80"),
+      panel.grid.minor = element_line(size = 0.2, linetype = 'dotted', colour = "grey80"),
+      axis.line.x = element_line(colour = "black", size = 0.3),
+      axis.line.y = element_line(colour = "black", size = 0.3),
+      plot.margin = unit(c(15, 5.5, 5.5, 5.5), "pt")
     )
 }
 
@@ -90,6 +97,12 @@ plot_info <- list(
       "wet"  = "dotted",     # Dot-dash line for wet scenarios (visibly distinct)
       "Paris" = "dashed"  # Dashed line for Paris Agreement scenario
     ),
+    shapes = c(
+      "ref" = 16,           # Circle for reference
+      "dry" = 4,           # Triangle for dry scenarios
+      "wet" = 18,           # Square for wet scenarios
+      "Paris" = 17          # Diamond for Paris Agreement scenario
+    ),
     labels = c(
       "ref" = "Reference",
       "dry" = "dry",
@@ -153,13 +166,13 @@ plot_info <- list(
     ),
     labels = c(
       "ref_ref" = "Reference",
-      "L_Paris" = "L 1.5°C",
-      "L_dry" = "L dry",
-      "L_wet" = "L wet",
-      "M_dry" = "M dry",
-      "M_wet" = "M wet",
-      "H_dry" = "H dry",
-      "H_wet" = "H wet"
+      "L_Paris" = "Low 1.5°C",
+      "L_dry" = "Low dry",
+      "L_wet" = "Low wet",
+      "M_dry" = "Moderate dry",
+      "M_wet" = "Moderate wet",
+      "H_dry" = "High dry",
+      "H_wet" = "High wet"
     )
   ),
   scen_hor = list(
@@ -167,7 +180,7 @@ plot_info <- list(
       # Observation / hindcast / reference
       "observation_observation" = "black",
       "hindcast_hindcast"    = "grey40",
-      "ref_ref"         = "grey70",
+      "ref_ref"         = "grey50",
       
       # L scenario (blue)
       "L_2033" = "#5a8db8",  # slightly lighter than base
@@ -180,9 +193,9 @@ plot_info <- list(
       "M_2150" = "#d47500",  # slightly darker
       
       # H scenario (red)
-      "H_2050" = "#c65a5a",  # slightly lighter
-      "H_2100" = "#990002",  # base
-      "H_2150" = "#730001"   # slightly darker
+      "H_2050" = rgb(230, 115, 115, maxColorValue = 255),  # Light red (new base)
+      "H_2100" = rgb(204, 51, 51, maxColorValue = 255),    # Medium red
+      "H_2150" = rgb(153, 0, 2, maxColorValue = 255)       # Dark red
     ),
     linetypes = c(
       "observation_observation" = "solid",
@@ -203,7 +216,7 @@ plot_info <- list(
     labels = c(
       "observation_observation" = "Observation",
       "hindcast_hindcast" = "Hindcast",
-      "ref_ref" = "KNMI Reference",
+      "ref_ref" = "Reference",
       "L_2033" = "L 1.5°C",
       "L_2100" = "L 2100",
       "M_2050" = "M 2050",

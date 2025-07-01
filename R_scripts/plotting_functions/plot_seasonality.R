@@ -168,9 +168,9 @@ plot_seasonality_ts <- function(
     ),
     linewidth = 2
   ) +
-    scale_x_date(date_labels = c("J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"), breaks = month_labels, expand = c(0, 0)) +
+    scale_x_date(date_labels = "%b", breaks = month_labels, expand = c(0, 0)) + # c("J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D")
     labs(
-      title = paste("30-day Moving Average", value_name, bsn, info_text),
+      title = NULL, # paste("30-day Moving Average", value_name, bsn, info_text),
       subtitle = subtitle_text,
       x = "Month",
       y = paste(value_name, value_unit),
@@ -180,6 +180,7 @@ plot_seasonality_ts <- function(
     ) +
     custom_theme() +
     theme(
+      legend.position = "top",
       legend.key.width = unit(2, "cm"),  # Adjust to your liking (default ~1.2cm)
       axis.title.x = element_blank()  # Remove the x-axis title
     ) +
@@ -192,8 +193,8 @@ plot_seasonality_ts <- function(
       labels = plot_info[[line_col]]$labels
     ) +
     guides(
-      color = guide_legend(title.position = "top", nrow = 1),
-      linetype = guide_legend(title.position = "top", nrow = 1)
+      color = guide_legend(title.position = "left", nrow = 1),
+      linetype = guide_legend(title.position = "left", nrow = 1)
     ) +
     ylim(450, 1450) +
     (if (show_range) scale_fill_manual(

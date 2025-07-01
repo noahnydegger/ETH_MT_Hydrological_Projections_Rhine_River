@@ -11,14 +11,15 @@ info_text = ""
 #info_text = "sund_bc"
   
 # select the dataset to plot: mit_output, meteo_stat, discharge, lakelevel, meteo_input
-dataset <- "meteo_input"
+dataset <- "discharge"
 
 plot_selection <- c(
   "seasonality" = FALSE,
   "seasonality_horizon" = FALSE,
+  "annual_horizon_mean_diff" = TRUE,
   "annual_boxplot" = FALSE,
   "annual_horizon_boxplot" = FALSE,
-  "annual_horizon_boxplot_combination" = TRUE,
+  "annual_horizon_boxplot_combination" = FALSE,
   "seasonal_boxplot" = FALSE,
   "monthly_boxplot" = FALSE,
   "annual_vars_change_boxplot" = FALSE,
@@ -51,8 +52,9 @@ scen_var_hor_sel <- c("observation_observation_observation", "hindcast_hindcast_
                       "M_wet_2150", "M_dry_2150",
                       "H_wet_2150", "H_dry_2150"
                       )
+
 horizon_sel <- c("observation", "hindcast", "ref", "2033", "2050", "2100", "2150")
-#horizon_sel <- c("observation", "hindcast", "ref")
+#horizon_sel <- c("ref", "2100")#, "2050", "2100", "2150")
 
 run_type_sel <- c("future_V1", "hindcast", "observation")
 
@@ -65,7 +67,7 @@ line_col_levels <- c("observation", "hindcast", "ref", "wet", "dry", "Paris")
 comparison_ref = "ref_ref"
 
 #color_col <- "scen_hor"
-#color_col_levels <- c("observation_observation", "hindcast_hindcast", "ref_ref")#, "L_2033", "M_2050", "H_2050", "L_2100", "M_2100", "H_2100", "M_2150", "H_2150")
+#color_col_levels <- c("observation_observation", "hindcast_hindcast", "ref_ref", "L_2033", "M_2050", "H_2050", "L_2100", "M_2100", "H_2100", "M_2150", "H_2150")
 
 #color_col <- "scen_var_hor"
 #color_col_levels <- scen_var_hor_sel
@@ -84,7 +86,7 @@ if (dataset == "mit_output") {
   
 } else if (dataset == "discharge") {
   basin_sel <- unique(knmi_discharge_dt$station)
-  basin_sel <- c("Basel Rheinhalle")#, "Aare_Thun", "Andelfingen")#, "Diepoldsau", "Rhine_Neuhausen", "Rekingen", "Aare_Thun", "Aare_Untersiggenthal", "Limmatt_Baden", "Mellingen")#, "Limmatt_Baden", "Reuss_Luzern", "Bruegg-Aegerten", "Aare_Untersiggenthal")
+  basin_sel <- c("Basel Rheinhalle")#, "Aare_Thun", "Andelfingen", "Diepoldsau", "Rhine_Neuhausen", "Rekingen", "Aare_Thun", "Aare_Untersiggenthal", "Limmatt_Baden", "Mellingen")#, "Limmatt_Baden", "Reuss_Luzern", "Bruegg-Aegerten", "Aare_Untersiggenthal")
   value_cols <- c("discharge")
   dt_dataset <- knmi_discharge_dt
   setnames(dt_dataset, old = "station", new = "basin", skip_absent = TRUE)
@@ -204,6 +206,34 @@ if (plot_selection["seasonality_horizon"]) {
   value_cols <- sub("rm_", "", value_cols)
 } # seasonality_horizon plot
 
+# annual horizon mean diff ------------------------------------------------------
+if (plot_selection["annual_horizon_mean_diff"]) {
+  
+  source(here("R_scripts", "plotting_functions", "plot_boxplots.R"))
+  
+  group_cols <- c("basin", "scenario", "variant", "horizon", "scen_var", "scen_var_hor", "hydro_model", "run_type")
+  linking_cols <- c("basin", "run_type")
+  
+  statistics <- c("mean")#, "min", "max", "7day_low")#, "min", "max", "7day_low")
+  
+  # generate annual boxplots
+  for (bsn in basin_sel) {
+    dt <- dt_subset[basin == bsn]
+    for (value_col in value_cols) {
+      if (all(is.na(dt[[value_col]]))) next
+      for (stat in statistics) {
+        cat("Plotting annual mean diff for", bsn, value_col, stat, "\n")
+        
+        dt_annual <- compute_annual_or_seasonal(dt, value_col, group_cols, statistic = stat, seasonal = FALSE)
+        dt_diff <- compute_mean_diff_se(dt, value_col, group_cols, linking_cols, comparison_col = color_col, comparison_ref = comparison_ref, stat)
+        
+        plot_annual_horizon_mean_diff(dt_diff, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text, rel = TRUE)
+        #plot_annual_horizon_mean_diff(dt_diff, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text, y_lim = NULL, abs = TRUE)
+      } # stat loop
+    } # column loop
+  } # basin loop
+} # annual horizon mean diff plot
+
 # annual boxplot plot ------------------------------------------------------
 if (plot_selection["annual_boxplot"]) {
   
@@ -253,7 +283,7 @@ if (plot_selection["annual_horizon_boxplot"]) {
         dt_annual <- compute_annual_or_seasonal(dt, value_col, group_cols, statistic = stat, seasonal = FALSE)
         dt_diff <- compute_member_differences(dt, value_col, group_cols, linking_cols, comparison_col = color_col, comparison_ref = comparison_ref, stat)
 
-        plot_annual_horizon_boxplots(dt_annual, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text, rel = FALSE)
+        #plot_annual_horizon_boxplots(dt_annual, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text, rel = FALSE)
         plot_annual_horizon_boxplots(dt_diff, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text, rel = TRUE)
         plot_annual_horizon_boxplots(dt_diff, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text, y_lim = NULL, abs = TRUE)
       } # stat loop
@@ -459,17 +489,35 @@ if (plot_selection["pdf_cdf"]) {
   
   source(here("R_scripts", "plotting_functions", "plot_pdf_cdf.R"))
   
-  group_cols <- c("basin", "scen_var_hor", "run_type", "hydro_model")
+  group_cols <- c("basin", "scenario", "variant", "scen_var", "scen_var_hor", "run_type", "hydro_model")
+  
+  color_col <- "scenario"
+  color_col_levels <- c("ref", "L", "M", "H")
+  group_col <- "scen_var"
   
   # generate pdf, cdf plots
   for (bsn in basin_sel) {
     dt <- dt_subset[basin == bsn]
     for (value_col in value_cols) {
       if (all(is.na(dt[[value_col]]))) next
-      cat("Plotting pdf, cdf for", bsn, value_col, "\n")
+      for (month in sprintf("%02d", 1:12)) {
+        dt_month <- dt[format(date, "%m") == month]
+        info_text_month <- paste0(info_text, "_", month)
+        cat("Plotting pdf, cdf for", bsn, value_col, month, "\n")
+
+        plot_pdf_with_percentiles(dt_month, plot_dir, bsn, color_col, color_col_levels, line_col, line_col_levels, group_col, value_col, group_cols, info_text_month)
+
+        #plot_pdf(dt_month, plot_dir, bsn, color_col, color_col_levels, value_col, group_cols, info_text_month)
+        #plot_cdf(dt_month, plot_dir, bsn, color_col, color_col_levels, value_col, group_cols, info_text_month)
+      } # month loop
       
-      plot_pdf(dt, plot_dir, bsn, color_col, color_col_levels, value_col, group_cols, info_text)
-      plot_cdf(dt, plot_dir, bsn, color_col, color_col_levels, value_col, group_cols, info_text)
+      info_text_year <- paste0(info_text, "_", "year")
+      
+      plot_pdf_with_percentiles(dt, plot_dir, bsn, color_col, color_col_levels, line_col, line_col_levels, group_col, value_col, group_cols, info_text_year)
+      
+      #plot_pdf(dt, plot_dir, bsn, color_col, color_col_levels, value_col, group_cols, info_text)
+      #plot_cdf(dt, plot_dir, bsn, color_col, color_col_levels, value_col, group_cols, info_text)
+      
     } # column loop
   } # basin loop
 } # pdf & cdf plot

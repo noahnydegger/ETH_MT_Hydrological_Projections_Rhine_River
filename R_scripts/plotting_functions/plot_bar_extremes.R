@@ -179,7 +179,7 @@ barplot_season <- function(dt, color_col, title, legend = T, y_label = T) {
       panel.grid.minor = element_line(linewidth = 0.1, linetype = 'dotted',colour = "grey80"),
       axis.line.x = element_line(colour = "black", size = 0.3), axis.line.y = element_line(colour = "black", size = 0.3)) +
     guides(fill = guide_legend(direction = "horizontal", title = NULL)) +
-    legend_theme +  # 👈 Add this instead
+    legend_theme +  # Add this instead
     theme(
           #legend.position = leg,
           #legend.justification = "right", 
@@ -205,15 +205,15 @@ barplot_season <- function(dt, color_col, title, legend = T, y_label = T) {
 }
 
 combined_bar_plot_season <- function(dt, plot_dir, bsn, q_bot, q_top, time_period) {
-  bot_days <- round(q_bot * 100)
-  top_days <- round(q_top * 100)
+  bot_days <- sprintf("%02d", round(q_bot * 100))
+  top_days <- sprintf("%02d", round(q_top * 100))
   
   titles <- c(
-    paste0("(a) low level Q", top_days),
-    paste0("(b) high level Q", bot_days)
+    paste0("(a) low flow Q", top_days),
+    paste0("(b) high flow Q", bot_days)
   )
-  lg <- c(F, T) # legend list
-  lab <- c(T, F) # y-label list
+  lg <- c(T, F) # legend list
+  lab <- c(T, T) # y-label list
   r_number <- c(1, 4, 6, 8)
   days_col <- c("days_below_qbot", "days_above_qtop")
   
@@ -266,13 +266,13 @@ combined_bar_plot_season <- function(dt, plot_dir, bsn, q_bot, q_top, time_perio
     pls[[i]] <- barplot_season(dt_summary, color_col, titles[i], legend = lg[i], y_label = lab[i])
   }
   
-  p <- plot_grid(pls[[1]], pls[[2]], ncol = 2)
+  p <- plot_grid(pls[[1]], pls[[2]], ncol = 1)
   
   # Save the plot
   save_dir <- file.path(plot_dir, "seasonal_barplots", value_col)
   filename <- paste0("seasonal_bar_combined_", bsn, paste0("_Q", q_bot*100, "_Q", q_top*100), "_", time_period, ".pdf")
   
-  save_plot(p, save_dir, filename, width = 8.27, height = 3)
+  save_plot(p, save_dir, filename, width = 6, height = 7)  # 8.27, 3
 
   # for(i in 1:length(data)){
   #   if(grepl("Drought", names(data)[i]) == T){

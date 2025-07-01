@@ -79,6 +79,47 @@ compute_relative_mean <- function(dt_mean, value_col, comparison_col, comparison
   return(dt_mean)
 }
 
+compute_mean_diff_se <- function(
+    dt, value_col, group_cols, linking_cols, comparison_col, comparison_ref,
+    statistic = "mean", seasonal = FALSE, monthly = FALSE, half_year = FALSE
+) {
+  
+  stat_col <- value_col # paste0(value_col, "_", statistic) #value_col # 
+  # Step 1: Aggregate to annual mean per group
+  dt_agg <- dt[, .(
+    mean_val = mean(get(stat_col), na.rm = TRUE),
+    sd_val = sd(get(stat_col), na.rm = TRUE),
+    n = .N
+  ), by = group_cols]
+  
+  # Step 2: Split into reference and comparison groups
+  ref_dt <<- dt_agg[get(comparison_col) == comparison_ref]
+  fut_dt <<- dt_agg[get(comparison_col) != comparison_ref]
+  
+  # Step 2a: Rename columns in ref_dt with `_ref` suffix (except for linking columns)
+  cols_to_rename <- setdiff(names(ref_dt), linking_cols)
+  setnames(ref_dt, cols_to_rename, paste0(cols_to_rename, "_ref"))
+  
+  # Step 3: Set keys for joining
+  setkeyv(ref_dt, linking_cols)
+  setkeyv(fut_dt, linking_cols)
+  
+  # Step 4: Join and compute difference + standard error
+  dt_diff <- fut_dt[ref_dt, on = linking_cols, nomatch = 0L]
+  
+  # Add columns
+  dt_diff[, mean_ref := mean_val_ref]
+  dt_diff[, mean_fut := mean_val]
+  dt_diff[, mean_diff_abs := mean_val - mean_val_ref]
+  dt_diff[, se_diff_abs := sqrt((sd_val^2 / n) + (sd_val_ref^2 / n_ref))]
+  
+  # Relative difference and standard error
+  dt_diff[, mean_diff_rel := 100 * mean_diff_abs / mean_ref]
+  dt_diff[, se_diff_rel := 100 * se_diff_abs / mean_ref]
+  
+  return(dt_diff)
+}
+
 compute_member_differences <- function(dt, value_col, group_cols, linking_cols, comparison_col, comparison_ref,
                                        statistic = "mean", seasonal = FALSE, monthly = FALSE, half_year = FALSE) {
   
@@ -219,7 +260,7 @@ plot_annual_boxplots <- function(dt_annual, plot_dir, bsn, color_col, color_col_
   
 }
 
-plot_annual_horizon_boxplots <- function(dt_annual, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text = "", y_lim = NULL, rel = FALSE, abs = FALSE) {
+plot_annual_horizon_boxplots <- function(dt, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text = "", y_lim = NULL, rel = FALSE, abs = FALSE) {
   
   value_name <- plot_info$column_info$names[[value_col]]
   value_unit <- plot_info$column_info$units[[value_col]]
@@ -233,6 +274,15 @@ plot_annual_horizon_boxplots <- function(dt_annual, plot_dir, bsn, color_col, co
     info_text <- paste0(info_text, "change")
     value_unit <- "[%]"
     y_text <- paste("change in", value_name, "[%]")
+    
+    rmse_dt <- dt[, .(
+      rmse_diff = sign(mean(get(stat_col), na.rm = TRUE)) * sqrt(mean((get(stat_col))^2, na.rm = TRUE))
+    ), by = c("target_member", group_cols)]
+
+    stat_col <- paste0(stat_col, "_rmse")
+    setnames(rmse_dt, "rmse_diff", stat_col)
+
+    dt <- rmse_dt
   }
   
   if (abs) {
@@ -240,24 +290,87 @@ plot_annual_horizon_boxplots <- function(dt_annual, plot_dir, bsn, color_col, co
     info_text <- paste0(info_text, " change")
     value_unit <- value_unit
     y_text <- paste("change in", value_name, value_unit)
+    
+    rmse_dt <- dt[, .(
+      rmse_diff = sign(mean(get(stat_col), na.rm = TRUE)) * sqrt(mean((get(stat_col))^2, na.rm = TRUE))
+    ), by = c("target_member", group_cols)]
+
+    stat_col <- paste0(stat_col, "_rmse")
+    setnames(rmse_dt, "rmse_diff", stat_col)
+
+    dt <- rmse_dt
   }
   
-  dt_annual[, (color_col) := factor(get(color_col), levels = color_col_levels)]
-  dt_annual[, horizon := factor(horizon, levels = c("ref", "2033", "2050", "2100", "2150"),
+  stat_dt<- dt[, .(
+    mean_diff = mean(get(stat_col), na.rm = TRUE),
+    q10 = quantile(get(stat_col), 0.1, na.rm = TRUE),
+    q90 = quantile(get(stat_col), 0.9, na.rm = TRUE),
+    min_val = min(get(stat_col), na.rm = TRUE),
+    max_val = max(get(stat_col), na.rm = TRUE)
+  ), by = group_cols]
+  
+  stat_col <- paste0(stat_col, "_mean")
+  setnames(stat_dt, "mean_diff", stat_col)
+
+  dt <- stat_dt
+  
+  dt[, (color_col) := factor(get(color_col), levels = color_col_levels)]
+  dt[, horizon := factor(horizon, levels = c("ref", "2033", "2050", "2100", "2150"),
                                 labels = c("Ref", "2033", "2050", "2100", "2150"))]
   
-  ref_q05 <- dt_annual[get(color_col) == comparison_ref, median(.SD[[1]], na.rm = TRUE), .SDcols = stat_col]
-  ref_q25 <- dt_annual[get(color_col) == comparison_ref, quantile(.SD[[1]], probs = 0.25, na.rm = TRUE), .SDcols = stat_col]
-  ref_q75 <- dt_annual[get(color_col) == comparison_ref, quantile(.SD[[1]], probs = 0.75, na.rm = TRUE), .SDcols = stat_col]
+  dt[, x_facet := match(get(color_col), levels(get(color_col))[levels(get(color_col)) %in% get(color_col)]), by = horizon]
+  
+  ref_q05 <- dt[get(color_col) == comparison_ref, median(.SD[[1]], na.rm = TRUE), .SDcols = stat_col]
+  ref_q25 <- dt[get(color_col) == comparison_ref, quantile(.SD[[1]], probs = 0.25, na.rm = TRUE), .SDcols = stat_col]
+  ref_q75 <- dt[get(color_col) == comparison_ref, quantile(.SD[[1]], probs = 0.75, na.rm = TRUE), .SDcols = stat_col]
+  
+  # reduce spread
+  box_width <- 0.6
+  half_width <- box_width / 2
+  line_width <- 0.6
   
   # Plot annual boxplots
-  p <- ggplot(dt_annual, aes(x = .data[[color_col]], y = .data[[stat_col]], fill = .data[[color_col]])) +
-    # geom_boxplot(position = position_dodge(width = 0.8), fatten = 2, size = 0.8) +
-    # geom_vline(xintercept = c(1.5, 2.5, 3.5, 4.5), color = "grey80") +  # <-- vertical lines between groups
-    geom_hline(yintercept = ref_q25, linetype = "dashed", color = "grey20") +
-    geom_hline(yintercept = ref_q75, linetype = "dashed", color = "grey20") +
-    geom_boxplot(width = 0.6, outlier.size = 0.5) +
-    facet_grid(~ horizon, scales = "free_x", space = "free_x", switch = "x") +
+  p <- ggplot(dt, aes(x = .data[[color_col]], y = .data[[stat_col]], fill = .data[[color_col]]))
+  
+  if (rel) {
+    p <- p + geom_hline(yintercept = 0, linewidth = 0.3, color = "grey30")
+  }
+  
+  if (!rel && !abs) {
+    p <- p + geom_hline(yintercept = ref_q25, linetype = "dashed", color = "grey20") +
+      geom_hline(yintercept = ref_q75, linetype = "dashed", color = "grey20")
+  }
+    
+  p <- p + 
+    #geom_boxplot(width = 0.6, outlier.size = 0.5) +
+    
+    geom_rect(
+      aes(xmin = x_facet - line_width / 2,
+          xmax = x_facet + line_width / 2,
+          ymin = min_val,
+          ymax = max_val,
+          fill = .data[[color_col]]),
+      alpha = 0.3,
+      color = NA  # no border
+    ) +
+    
+    geom_segment(
+      aes(x = x_facet - line_width / 2,
+          xend = x_facet + line_width / 2,
+          y = .data[[stat_col]],
+          yend = .data[[stat_col]],
+          color = .data[[color_col]]),
+      linewidth = 1.0
+    ) +
+    # geom_errorbar(
+    #   aes(x = as.numeric(factor(.data[[color_col]])),
+    #       ymin = min_val,
+    #       ymax = max_val,
+    #       color = .data[[color_col]]),
+    #   width = 0.3
+    # ) +
+    
+    facet_grid(~ horizon, scales = "free_x", space = "free_x", switch = "x", drop = TRUE) +
     labs(
       title = NULL,# paste("Annual", stat, value_name, bsn, info_text),
       x = NULL,
@@ -269,16 +382,157 @@ plot_annual_horizon_boxplots <- function(dt_annual, plot_dir, bsn, color_col, co
       legend.position = "top",
       strip.placement = "outside",
       strip.background = element_blank(),
+      panel.background = element_rect(fill = "white", colour = NA),
       axis.text.x = element_blank(),
       axis.ticks.x = element_blank(),
       panel.spacing = unit(1.0, "lines"),
-      #panel.grid.major.y = element_blank(),
-      #panel.grid.minor.y = element_blank(),
+      panel.grid.major.y = element_line(size = 0.3, linetype = 'solid', colour = "grey70"),
+      panel.grid.minor.y = element_blank(),
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor.x = element_blank(),
       legend.direction = "horizontal",
       legend.box = "horizontal"
     ) +
     guides(
       fill = guide_legend(nrow = 1),
+      color = "none" # guide_legend(nrow = 1)
+    ) +
+    (if (!is.null(y_lim)) 
+      ylim(y_lim) else NULL) +
+    scale_fill_manual(
+      values = plot_info[[color_col]]$colors,
+      labels = plot_info[[color_col]]$labels
+    ) +
+    scale_color_manual(
+      values = plot_info[[color_col]]$colors,
+      labels = plot_info[[color_col]]$labels
+    )
+
+  # Save the plot
+  save_dir <- file.path(plot_dir, "annual_horizon_boxplots", value_col, "new_stats")
+  filename <- paste0("annual_horizon_", bsn, "_", stat_col, info_text, ".pdf")
+  save_plot(p, save_dir, filename, width = 18, height = 6)
+  
+}
+
+plot_annual_horizon_mean_diff <- function(dt, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text = "", y_lim = NULL, rel = FALSE, abs = FALSE) {
+  
+  value_name <- plot_info$column_info$names[[value_col]]
+  value_unit <- plot_info$column_info$units[[value_col]]
+  
+  y_text <- paste(value_name, value_unit)
+  
+  stat_col <- paste0(value_col, "_", stat)
+  
+  if (rel) {
+    stat_col <- paste0(stat_col, "_rel_diff")
+    info_text <- paste0(info_text, "change")
+    value_unit <- "[%]"
+    y_text <- paste("change in", value_name, "[%]")
+    
+    mean_col <- "mean_diff_rel"
+    se_col <- "se_diff_rel"
+  
+  }
+  
+  if (abs) {
+    stat_col <- paste0(stat_col, "_abs_diff")
+    info_text <- paste0(info_text, " change")
+    value_unit <- value_unit
+    y_text <- paste("change in", value_name, value_unit)
+    
+    mean_col <- "mean_diff_abs"
+    se_col <- "se_diff_abs"
+    
+  }
+  
+  dt[, `:=`(
+    min_val = get(mean_col) - get(se_col),
+    max_val = get(mean_col) + get(se_col)
+  )]
+  
+  dt[, (color_col) := factor(get(color_col), levels = color_col_levels)]
+  dt[, horizon := factor(horizon, levels = c("ref", "2033", "2050", "2100", "2150"),
+                         labels = c("Ref", "2033", "2050", "2100", "2150"))]
+  
+  dt[, x_facet := match(get(color_col), levels(get(color_col))[levels(get(color_col)) %in% get(color_col)]), by = horizon]
+  
+  # ref_q05 <- dt[get(color_col) == comparison_ref, median(.SD[[1]], na.rm = TRUE), .SDcols = stat_col]
+  # ref_q25 <- dt[get(color_col) == comparison_ref, quantile(.SD[[1]], probs = 0.25, na.rm = TRUE), .SDcols = stat_col]
+  # ref_q75 <- dt[get(color_col) == comparison_ref, quantile(.SD[[1]], probs = 0.75, na.rm = TRUE), .SDcols = stat_col]
+  
+  # reduce spread
+  box_width <- 0.6
+  line_width <- 0.6
+  
+  # Plot annual boxplots
+  p <- ggplot(dt, aes(x = .data[[color_col]], y = .data[[mean_col]], fill = .data[[color_col]]))
+  
+  if (rel) {
+    p <- p + geom_hline(yintercept = 0, linewidth = 0.3, color = "grey30")
+  }
+  
+  if (!rel && !abs) {
+    p <- p + geom_hline(yintercept = ref_q25, linetype = "dashed", color = "grey20") +
+      geom_hline(yintercept = ref_q75, linetype = "dashed", color = "grey20")
+  }
+  
+  p <- p + 
+    #geom_boxplot(width = 0.6, outlier.size = 0.5) +
+    
+    geom_rect(
+      aes(xmin = x_facet - box_width / 2,
+          xmax = x_facet + box_width / 2,
+          ymin = min_val,
+          ymax = max_val,
+          fill = .data[[color_col]]),
+      alpha = 0.4,
+      color = NA  # no border
+    ) +
+    
+    geom_segment(
+      aes(x = x_facet - line_width / 2,
+          xend = x_facet + line_width / 2,
+          y = .data[[mean_col]],
+          yend = .data[[mean_col]],
+          color = .data[[color_col]]),
+      linewidth = 1.0
+    ) +
+    # geom_errorbar(
+    #   aes(x = as.numeric(factor(.data[[color_col]])),
+    #       ymin = min_val,
+    #       ymax = max_val,
+    #       color = .data[[color_col]]),
+    #   width = 0.3
+    # ) +
+    
+    facet_grid(~ horizon, scales = "free_x", space = "free_x", switch = "x", drop = TRUE) +
+    labs(
+      title = NULL,# paste("Annual", stat, value_name, bsn, info_text),
+      x = NULL,
+      y = y_text,
+      fill = NULL,
+      color = NULL
+    )  +
+    custom_theme() +
+    theme(
+      legend.position = "top",
+      legend.key.width = unit(1.5, "cm"),
+      strip.placement = "outside",
+      strip.background = element_blank(),
+      panel.background = element_rect(fill = "white", colour = NA),
+      axis.text.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      panel.spacing = unit(1.0, "lines"),
+      panel.grid.major.y = element_line(size = 0.3, linetype = 'dotted', colour = "grey80"),
+      panel.grid.minor.y = element_blank(),
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor.x = element_blank(),
+      legend.direction = "horizontal",
+      legend.box = "horizontal"
+    ) +
+    guides(
+      fill = "none",
       color = guide_legend(nrow = 1)
     ) +
     (if (!is.null(y_lim)) 
@@ -286,12 +540,16 @@ plot_annual_horizon_boxplots <- function(dt_annual, plot_dir, bsn, color_col, co
     scale_fill_manual(
       values = plot_info[[color_col]]$colors,
       labels = plot_info[[color_col]]$labels
+    ) +
+    scale_color_manual(
+      values = plot_info[[color_col]]$colors,
+      labels = plot_info[[color_col]]$labels
     )
-
+  
   # Save the plot
-  save_dir <- file.path(plot_dir, "annual_horizon_boxplots", value_col)
-  filename <- paste0("annual_horizon_", bsn, "_", stat_col, info_text, ".pdf")
-  save_plot(p, save_dir, filename, width = 12, height = 6)
+  save_dir <- file.path(plot_dir, "annual_horizon_mean_se", value_col)
+  filename <- paste0("annual_horizon_", bsn, "_", value_col, info_text, ".pdf")
+  save_plot(p, save_dir, filename, width = 18, height = 6)
   
 }
 
@@ -310,6 +568,9 @@ plot_annual_horizon_boxplots_combination <- function(dt, plot_dir, bsn, color_co
     info_text <- paste0(info_text, "change")
     value_unit <- "[%]"
     y_text <- paste("change", "[%]")
+    
+    mean_col <- "mean_diff_rel"
+    se_col <- "se_diff_rel"
   }
   
   if (abs) {
@@ -317,7 +578,15 @@ plot_annual_horizon_boxplots_combination <- function(dt, plot_dir, bsn, color_co
     info_text <- paste0(info_text, " change")
     value_unit <- value_unit
     y_text <- paste("change", value_unit)
+    
+    mean_col <- "mean_diff_abs"
+    se_col <- "se_diff_abs"
   }
+  
+  dt[, `:=`(
+    min_val = get(mean_col) - get(se_col),
+    max_val = get(mean_col) + get(se_col)
+  )]
   
   if(y_label == T){
     ylab <- y_text
@@ -335,20 +604,45 @@ plot_annual_horizon_boxplots_combination <- function(dt, plot_dir, bsn, color_co
     theme(legend.position = "none")
   }
   
+  box_width <- 0.6
+  line_width <- 0.6
+  
   # Plot annual boxplots
-  p <- ggplot(dt, aes(x = .data[[color_col]], y = .data[[stat_col]], fill = .data[[color_col]]))
+  p <- ggplot(dt, aes(x = .data[[color_col]], y = .data[[mean_col]], fill = .data[[color_col]]))
   
   if (rel) {
     p <- p + geom_hline(yintercept = 0, linewidth = 0.3, color = "grey50")
   }
   
-  p <- p + geom_boxplot(width = 0.6, outlier.size = 0.5) +
+  p <- p + 
+    #geom_boxplot(width = 0.6, outlier.size = 0.5) +
+    
+    geom_rect(
+      aes(xmin = x_facet - box_width / 2,
+          xmax = x_facet + box_width / 2,
+          ymin = min_val,
+          ymax = max_val,
+          fill = .data[[color_col]]),
+      alpha = 0.4,
+      color = NA  # no border
+    ) +
+    
+    geom_segment(
+      aes(x = x_facet - line_width / 2,
+          xend = x_facet + line_width / 2,
+          y = .data[[mean_col]],
+          yend = .data[[mean_col]],
+          color = .data[[color_col]]),
+      linewidth = 1.0
+    ) +
+    
     facet_grid(~ horizon, scales = "free_x", space = "free_x", switch = "x") +
     labs(
       title = title,# paste("Annual", stat, value_name, bsn, info_text),
       x = NULL,
       y = ylab,
-      fill = NULL
+      fill = NULL,
+      color = NULL
     ) +
     custom_theme() +
     legend_theme +
@@ -367,8 +661,10 @@ plot_annual_horizon_boxplots_combination <- function(dt, plot_dir, bsn, color_co
       legend.background = element_rect(fill = "transparent", colour = NA),
       #legend.text = element_text(size = 8),
       panel.background = element_rect(fill = "white", colour = "grey96"),
-      panel.grid.major = element_line(size = 0.2, linetype = 'dotted', colour = "grey80"),
-      panel.grid.minor = element_line(size = 0.2, linetype = 'dotted', colour = "grey80"),
+      panel.grid.major.y = element_line(size = 0.3, linetype = 'dotted', colour = "grey80"),
+      panel.grid.minor.y = element_blank(),
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor.x = element_blank(),
       axis.line.x = element_line(colour = "black", size = 0.3),
       axis.line.y = element_line(colour = "black", size = 0.3),
       #axis.title = element_text(size = 10),
@@ -376,10 +672,14 @@ plot_annual_horizon_boxplots_combination <- function(dt, plot_dir, bsn, color_co
       plot.margin = unit(c(15, 5.5, 5.5, 5.5), "pt")
     ) +
     guides(
-      fill = guide_legend(nrow = 1),
-      color = guide_legend(nrow = 1)
+      fill = "none",
+      color =  guide_legend(nrow = 1)
     ) +
     scale_fill_manual(
+      values = plot_info[[color_col]]$colors,
+      labels = plot_info[[color_col]]$labels
+    ) +
+    scale_color_manual(
       values = plot_info[[color_col]]$colors,
       labels = plot_info[[color_col]]$labels
     )
@@ -404,7 +704,7 @@ combined_annual_horizon_boxplot <- function(dt, plot_dir, bsn) {
   absolute <- c(T, F) # absolute change
   
   value_cols <- c("tair_avg", "prec_avg")
-  y_lims <- list(c(0, 8), NULL)
+  y_lims <- list(c(0, 8), c(-5, 12))
   
   color_col <- "scen_var"
   color_col_levels <- c("ref_ref","L_Paris", "L_wet", "L_dry", "M_wet", "M_dry", "H_wet", "H_dry")
@@ -419,13 +719,19 @@ combined_annual_horizon_boxplot <- function(dt, plot_dir, bsn) {
   # create all plots
   pls <- list() # empty list
   for (i in seq_along(value_cols)) {
-    value_col <<- value_cols[i]
+    value_col <- value_cols[i]
     
-    dt_diff <<- compute_member_differences(dt, value_col, group_cols, linking_cols, comparison_col = color_col, comparison_ref = comparison_ref, stat)
+    #dt_diff <- compute_member_differences(dt, value_col, group_cols, linking_cols, comparison_col = color_col, comparison_ref = comparison_ref, stat)
+    # dt_annual <- compute_annual_or_seasonal(
+    #   dt, value_col, group_cols, statistic = stat, seasonal = FALSE
+    # )
+    dt_diff <<- compute_mean_diff_se(dt, value_col, group_cols, linking_cols, comparison_col = color_col, comparison_ref = comparison_ref, statistic = stat)
     
     dt_diff[, (color_col) := factor(get(color_col), levels = color_col_levels)]
     dt_diff[, horizon := factor(horizon, levels = c("ref", "2033", "2050", "2100", "2150"),
                            labels = c("Ref", "2033", "2050", "2100", "2150"))]
+    dt_diff[, x_facet := match(get(color_col), levels(get(color_col))[levels(get(color_col)) %in% get(color_col)]), by = horizon]
+    
     
     pls[[i]] <- plot_annual_horizon_boxplots_combination(dt_diff, plot_dir, bsn, color_col, value_col, stat, y_lim = y_lims[[i]], rel = relative[i], abs = absolute[i], 
                                                          titles[i], legend = lg[i], y_label = lab[i])

@@ -303,3 +303,58 @@ for (ens in c("ens3", "ens4", "ens5", "ens6", "ens7", "ens8")) {
   )
 }
 
+# add hindcast and reference sund data
+hind_sund_dt <- readRDS("/Volumes/MT_case_sensitive/ETH_MT_Hydrological_Projections_Rhine_River/Data/Rheinblick2027/processed_meteo/hindcast/sund_rel_crop/hindcast_sund_rel_stats.rds")
+setDT(hind_sund_dt)
+
+hind_sund_dt[, sund_rel_bc := NULL]
+setnames(hind_sund_dt, "ensemble", "member")
+
+hind_sund_dt[, basin := "RhB200"]
+hind_sund_dt[, date := as.Date(date)]
+hind_sund_dt[, scenario := "observation"]
+hind_sund_dt[, variant := "observation"]
+hind_sund_dt[, horizon := "observation"]
+hind_sund_dt[, run_type := "observation"]
+hind_sund_dt[, hydro_model := "none"]
+hind_sund_dt[, source := "WSL"]
+
+hind_sund_dt <- add_scenario_horizon_grouping_columns(hind_sund_dt)
+hind_sund_dt <- add_time_period_column(hind_sund_dt)
+
+ref_sund_raw_dt <- readRDS("/Volumes/MT_case_sensitive/ETH_MT_Hydrological_Projections_Rhine_River/Data/Rheinblick2027/processed_meteo/reference/sund_rel_crop/reference_sund_rel_stats.rds")
+setDT(ref_sund_raw_dt)
+
+ref_sund_dt <- rbindlist(list(
+  ref_sund_raw_dt[, .(date, member, sund_rel = sund_rel, run_type = "no_sund_bc")],
+  ref_sund_raw_dt[, .(date, member, sund_rel = sund_rel_bc, run_type = "sund_bc")]
+), use.names = TRUE)
+
+ref_sund_dt[, member := as.integer(sub("ens", "", member))]
+
+ref_sund_dt[, basin := "RhB200"]
+ref_sund_dt[, date := as.Date(date)]
+ref_sund_dt[, scenario := "ref"]
+ref_sund_dt[, variant := "ref"]
+ref_sund_dt[, horizon := "ref"]
+ref_sund_dt[, hydro_model := "none"]
+ref_sund_dt[, source := "KNMI"]
+
+ref_sund_dt <- add_scenario_horizon_grouping_columns(ref_sund_dt)
+ref_sund_dt <- add_time_period_column(ref_sund_dt)
+
+# combine hindcast, ref sund data
+knmi_sund_dt <- data.table::rbindlist(list(hind_sund_dt, ref_sund_dt), use.names = TRUE)
+
+setorder(knmi_sund_dt, scen_var_hor, member, date)
+
+output_sund_rds <- file.path(output_dir, "knmi_sund.rds")
+output_sund_csv <- file.path(output_dir, "knmi_sund.csv")
+
+# Save as .rds (binary format)
+saveRDS(knmi_sund_dt, file = output_sund_rds)
+# Save as .csv (readable text format)
+fwrite(knmi_sund_dt, file = output_sund_csv)
+
+cat("Exported KNMI sund dataset to:\n", output_dir, "\n")
+

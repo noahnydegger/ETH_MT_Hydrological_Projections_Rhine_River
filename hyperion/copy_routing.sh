@@ -41,7 +41,7 @@ for ENS in $ENSEMBLES; do
             mkdir -p "$LOCAL_PATH"
 
             rsync -avz \
-                --include='Neuhausen200.dat' \
+                --include='*.dat' \
                 --exclude='*' \
                 "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_PATH}" "$LOCAL_PATH"
 

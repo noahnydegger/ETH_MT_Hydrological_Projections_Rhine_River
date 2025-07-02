@@ -358,6 +358,8 @@ if (length(scenario_horizons) > 0) {
   } # gebiete loop
   scenario_discharge_dt <- rbindlist(discharge_data_list)
   export_discharge_per_scenario_horizon(scenario_discharge_dt, output_dir, "discharge", run_type)
+  rm(scenario_discharge_dt)
+  gc()
 }
 
 
@@ -389,6 +391,10 @@ if (read_hindcast) {
   
   hind_discharge_dt <- rbindlist(hind_discharge_list)
   export_discharge_per_scenario_horizon(hind_discharge_dt, output_dir, "discharge", run_type_name = "hindcast")
+  
+  rm(hind_discharge_dt)
+  rm(hind_discharge_list)
+  gc()
 }
 
 if (read_observation) {
@@ -415,10 +421,17 @@ if (read_observation) {
   }
   obse_discharge_dt <- rbindlist(obse_discharge_list)
   export_discharge_per_scenario_horizon(obse_discharge_dt, output_dir, "discharge", run_type_name = "observation")
+  
+  rm(obse_discharge_dt)
+  rm(obse_discharge_list)
+  gc()
 }
 
 # Combine all knmi data into a single data.table
 knmi_discharge_dt <- rbindlist(discharge_data_list)
+
+rm(discharge_data_list)
+gc()
 
 # change scenario, variant columns for Rheinblick
 knmi_discharge_dt[variant %in% c("ref", "Paris", "hindcast", "observation"),

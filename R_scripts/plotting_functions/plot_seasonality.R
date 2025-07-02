@@ -137,8 +137,9 @@ plot_seasonality_ts <- function(
   # Plot
   p <- ggplot(dt, aes(x = as.Date(DayOfYear - 1, origin = "2023-01-01"),
                       group = .data[[color_col]], 
-                      color = .data[[color_col]], 
-                      linetype = .data[[line_col]])) +
+                      color = .data[[color_col]] 
+                      #linetype = .data[[line_col]]
+                      )) +
     geom_vline(xintercept = as.numeric(month_lines), color = "gray90")
 
   if (show_range) {
@@ -163,7 +164,7 @@ plot_seasonality_ts <- function(
     aes(
       y = .data[[stat_col]],
       color = .data[[color_col]],
-      linetype = .data[[line_col]],
+      #linetype = .data[[line_col]],
       group = interaction(.data[[color_col]], .data[[line_col]])
     ),
     linewidth = 2
@@ -174,8 +175,8 @@ plot_seasonality_ts <- function(
       subtitle = subtitle_text,
       x = "Month",
       y = paste(value_name, value_unit),
-      color = "Scenario",
-      linetype = "Variant",
+      color = "Type",
+      #linetype = "Variant",
       fill = paste0(q_bot * 100, "-", q_top * 100, " % Quantile")
     ) +
     custom_theme() +
@@ -188,15 +189,15 @@ plot_seasonality_ts <- function(
       values = plot_info[[color_col]]$colors,
       labels = plot_info[[color_col]]$labels
     ) +
-    scale_linetype_manual(
-      values = plot_info[[line_col]]$linetypes,
-      labels = plot_info[[line_col]]$labels
-    ) +
+    # scale_linetype_manual(
+    #   values = plot_info[[line_col]]$linetypes,
+    #   labels = plot_info[[line_col]]$labels
+    # ) +
     guides(
-      color = guide_legend(title.position = "left", nrow = 1),
-      linetype = guide_legend(title.position = "left", nrow = 1)
+      color = guide_legend(title.position = "left", nrow = 1)
+      #linetype = guide_legend(title.position = "left", nrow = 1)
     ) +
-    ylim(450, 1450) +
+    #ylim(450, 1450) +
     (if (show_range) scale_fill_manual(
       values = plot_info[[color_col]]$colors,
       labels = plot_info[[color_col]]$labels

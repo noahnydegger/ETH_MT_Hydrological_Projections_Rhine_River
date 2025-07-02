@@ -50,8 +50,8 @@ station_sel <- c("Basel Rheinhalle", "Diepoldsau", "Rhine_Neuhausen", "Rekingen"
                "Limmatt_Baden", "Mellingen", "Reuss_Seedorf")  # MT_sel
 
 # To include all .rds files without filtering, uncomment the lines below:
-# scenario_horizons <- character(0)
-# run_type_sel <- character(0)
+scenario_horizons <- character(0)
+run_type_sel <- character(0)
 
 knmi_variables <- list(
   knmi_mit_output_dt = list(read = FALSE, read_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "prevah_mit_output_future_V1_MT_sel.rds"),
@@ -61,7 +61,7 @@ knmi_variables <- list(
                             combine = FALSE, combine_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "meteo_stat")),
   
   knmi_discharge_dt = list(read = FALSE, read_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "prevah_discharge_knmi_future_V1_MT_sel.rds"),
-                           combine = TRUE, combine_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "discharge")),
+                           combine = FALSE, combine_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "discharge")),
   
   knmi_lakelevel_dt = list(read = FALSE, read_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "prevah_lakelevel_knmi_future_V1_MT_sel.rds"),
                            combine = FALSE, combine_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "lakelevel")),
@@ -72,10 +72,15 @@ knmi_variables <- list(
 ch2018_variables <- list(
   ch2018_chain_glchain_dt = list(read = FALSE, 
                                  read_dir = file.path(home_dir, "Data", "Rheinblick2027", "ch2018", "ch2018_chain_glchain.rds")),
+  
   ch2018_meteo_dt = list(read = FALSE, 
                          read_dir = file.path(home_dir, "Data", "Rheinblick2027", "ch2018", "ch2018_meteo.rds")),
+  
   ch2018_glacier_dt = list(read = FALSE, 
-                           read_dir = file.path(home_dir, "Data", "Rheinblick2027", "ch2018", "ch2018_glacier.rds"))
+                           read_dir = file.path(home_dir, "Data", "Rheinblick2027", "ch2018", "ch2018_glacier.rds")),
+  
+  ch2018_discharge_dt = list(read = FALSE, read_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "prevah_discharge_ch2018_MT_sel.rds"),
+                           combine = TRUE, combine_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "discharge", "CH2018"))
 )
 
 # functions ----------------------------------------------------------------
@@ -170,8 +175,10 @@ combine_rds_scenario_data <- function(var_list) {
     # Order the combined data
     if ("basin" %in% colnames(combined_dt)) {
       data.table::setorder(combined_dt, horizon, scenario, variant, member, basin, date)
-    } else if ("station" %in% colnames(combined_dt)) {
+    } else if (all(c("station", "scenario") %in% colnames(combined_dt))) {
       data.table::setorder(combined_dt, horizon, scenario, variant, member, station, date)
+    } else if (all(c("station", "chain") %in% colnames(combined_dt))) {
+      data.table::setorder(combined_dt, chain, station, date)
     } else if ("lake" %in% colnames(combined_dt)) {
       data.table::setorder(combined_dt, horizon, scenario, variant, member, lake, date)
     } else {
@@ -191,16 +198,6 @@ combine_rds_scenario_data <- function(var_list) {
     
     message("Saved combined '", varname, "' to: ", read_dir)
     
-    # Save as RDS only if no filtering was applied
-    if (length(scenario_horizons) == 0 && length(run_type_sel) == 0) {
-      saveRDS(combined_dt, file = read_dir)
-      
-      # Also save as CSV (same base name, .csv extension)
-      csv_path <- sub("\\.rds$", ".csv", read_dir)
-      data.table::fwrite(combined_dt, file = csv_path)
-      
-      message("Saved combined '", varname, "' to: ", read_dir)
-    }
   }
 }
 
@@ -209,4 +206,5 @@ read_variables_from_list(knmi_variables)
 read_variables_from_list(ch2018_variables)
 
 combine_rds_scenario_data(knmi_variables)
+combine_rds_scenario_data(ch2018_variables)
 

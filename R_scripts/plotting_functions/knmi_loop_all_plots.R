@@ -10,13 +10,14 @@ plot_dir <- file.path(home_dir, "Plots", "future_V1", "all_data")
 info_text = ""
 #info_text = "sund_bc"
   
-# select the dataset to plot: mit_output, meteo_stat, discharge, lakelevel, meteo_input
+# select the dataset to plot: mit_output, meteo_stat, discharge, lakelevel, meteo_input, meteo_sund
 dataset <- "discharge"
 
 plot_selection <- c(
   "seasonality" = FALSE,
   "seasonality_horizon" = FALSE,
-  "annual_horizon_mean_diff" = TRUE,
+  "annual_horizon_mean_diff" = FALSE,
+  "CH2018_annual_comparison" = TRUE,
   "annual_boxplot" = FALSE,
   "annual_horizon_boxplot" = FALSE,
   "annual_horizon_boxplot_combination" = FALSE,
@@ -56,7 +57,7 @@ scen_var_hor_sel <- c("observation_observation_observation", "hindcast_hindcast_
 horizon_sel <- c("observation", "hindcast", "ref", "2033", "2050", "2100", "2150")
 #horizon_sel <- c("ref", "2100")#, "2050", "2100", "2150")
 
-run_type_sel <- c("future_V1", "hindcast", "observation")
+run_type_sel <- c("future_V1", "hindcast", "observation", "no_sund_bc", "sund_bc")
 
 hydro_model_sel <- c("none","observation" ,"PREVAH") #, "wflow_sbm", "larsim", "PREVAH")
 
@@ -75,6 +76,9 @@ comparison_ref = "ref_ref"
 #color_col <- "scenario"
 #color_col_levels <- c("ref", "L", "M", "H")
 #scen_var_hor_sel <- c("ref_ref_ref", "L_Paris_2033", "H_wet_2150", "H_dry_2150")
+
+color_col <- "run_type"
+color_col_levels <- c("observation", "hindcast", "sund_bc", "no_sund_bc", "future_V1")
 
 if (dataset == "mit_output") {
   value_cols <- c("RGES", "GLAC", "P-SME", "P-kor", "EREA", "EPOT", "S-SNO", "P-uk")
@@ -102,6 +106,11 @@ if (dataset == "mit_output") {
   basin_sel <- c("RhB200")
   value_cols <- c("prec_avg")#"tair_avg")#, "prec_avg") #"prec_avg")#
   dt_dataset <- knmi_meteo_input_dt
+  
+} else if (dataset == "meteo_sund") {
+  basin_sel <- c("RhB200")
+  value_cols <- c("sund_rel")
+  dt_dataset <- knmi_sund_dt
   
 } else {
   stop("Unknown dataset")
@@ -233,6 +242,81 @@ if (plot_selection["annual_horizon_mean_diff"]) {
     } # column loop
   } # basin loop
 } # annual horizon mean diff plot
+
+# ch2018 annual comparison ------------------------------------------------------
+if (plot_selection["CH2018_annual_comparison"]) {
+  
+  source(here("R_scripts", "plotting_functions", "plot_ch2018_comparison.R"))
+  
+  knmi_dt <- dt_subset
+  ch2018_dt <- ch2018_discharge_dt
+  ch2018_dt <- ch2018_dt[period %in% c("reference", "simulation")]
+  setnames(ch2018_dt, old = "station", new = "basin", skip_absent = TRUE)
+  
+  # # Extract unique horizons and remove "ref"
+  # horizons <- setdiff(unique(knmi_dt$horizon), c("ref", "hindcast", "observation"))
+  # horizons_num <- as.integer(horizons[grepl("^\\d{4}$", horizons)])
+  # 
+  # # Extract year from date
+  # ch2018_dt[, year := as.integer(format(date, "%Y"))]
+  # 
+  # # Initialize column
+  # ch2018_dt[, horizon := NA_character_]
+  # 
+  # # Assign numeric horizons by ±15-year range
+  # for (h in horizons_num) {
+  #   ch2018_dt[year >= h - 14 & year <= h + 15, horizon := as.character(h)]
+  # }
+  # 
+  # # Treat "ref" separately (e.g., 1981–2010)
+  # ch2018_dt[year >= 1981 & year <= 2010, horizon := "ref"]
+  # 
+  # # Clean up
+  # ch2018_dt[, year := NULL]
+  # 
+  # # Map RCP values to scenario codes
+  # ch2018_dt[, scenario := fifelse(rcp == "RCP85", "H",
+  #                                 fifelse(rcp == "RCP45", "M",
+  #                                         fifelse(rcp == "RCP26", "L", NA_character_)))]
+  
+  group_cols_knmi <- c("basin", "scenario", "variant", "horizon", "scen_var", "scen_var_hor", "hydro_model", "run_type")
+  linking_cols_knmi <- c("basin", "run_type")
+  
+  group_cols_ch2018 <- c("basin", "chain", "scenario", "horizon", "hydro_model", "run_type")
+  linking_cols_ch2018 <- c("basin", "chain")
+  
+  comparison_col_knmi <- "scen_var"
+  comparison_ref_knmi <- "ref_ref"
+  
+  comparison_col_ch2018 <- "horizon"
+  comparison_ref_ch2018 <- "ref"
+  
+  color_col <- "scenario"
+  color_col_levels <- c("ref", "L", "M", "H")
+  
+  statistics <- c("mean")#, "min", "max", "7day_low")#, "min", "max", "7day_low")
+  
+  # generate annual boxplots
+  for (bsn in basin_sel) {
+    knmi_dt <- dt_subset[basin == bsn]
+    ch2018_dt <- ch2018_discharge_dt[basin == bsn]
+    for (value_col in value_cols) {
+      if (all(is.na(knmi_dt[[value_col]]))) next
+      for (stat in statistics) {
+        cat("Plotting annual ch2018 comparison", bsn, value_col, stat, "\n")
+        
+        #knmi_dt_annual <- compute_annual_or_seasonal(dt, value_col, group_cols, statistic = stat, seasonal = FALSE)
+        knmi_dt_diff <- compute_mean_diff_se(knmi_dt, value_col, group_cols_knmi, linking_cols_knmi, comparison_col_knmi, comparison_ref_knmi, stat)
+        
+        #ch2018_dt_annual <- compute_annual_or_seasonal(ch2018_dt, value_col, group_cols, statistic = stat, seasonal = FALSE)
+        ch2018_dt_diff <- compute_mean_diff_se(ch2018_dt, value_col, group_cols_ch2018, linking_cols_ch2018, comparison_col_ch2018, comparison_ref_ch2018, stat)
+        
+        plot_annual_horizon_mean_diff_ch2018(knmi_dt_diff, ch2018_dt_diff, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text, rel = TRUE)
+        #plot_annual_horizon_mean_diff(dt_diff, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text, y_lim = NULL, abs = TRUE)
+      } # stat loop
+    } # column loop
+  } # basin loop
+} # ch2018 annual comparison plot
 
 # annual boxplot plot ------------------------------------------------------
 if (plot_selection["annual_boxplot"]) {

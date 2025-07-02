@@ -312,6 +312,7 @@ plot_info <- list(
     colors = c(
       "observation" = "black",
       "hindcast" = "grey40",
+      "future_V1" = "grey60",
       "no_sund_bc" = "red",
       "sund_bc" = "orange",
       "with_glac_sdbc" = "darkblue",
@@ -320,6 +321,7 @@ plot_info <- list(
     linetypes = c(
       "observation" = "solid",
       "hindcast" = "solid",
+      "future_V1" = "solid",
       "no_sund_bc" = "solid",
       "sund_bc" = "solid",
       "with_glac_sdbc" = "solid",
@@ -328,8 +330,9 @@ plot_info <- list(
     labels = c(
       "observation" = "Observation",
       "hindcast" = "Hindcast",
+      "future_V1" = "Future V1",
       "no_sund_bc" = "without sund BC",
-      "sund_bc" = "steady glacier extent", "with sund BC",
+      "sund_bc" = "with sund BC",
       "with_glac_sdbc" = "with CH2018 glacier",# "with CH2018 glacier, with sund BC",
       "with_glac_sund" = "with CH2018 glacier, no sund BC"
     )
@@ -390,7 +393,7 @@ plot_info <- list(
       
       "sund_min" = "sunshine duration (min)",
       "sund_max" = "sunshine duration (max)",
-      "sund_avg" = "sunshine duration (avg)",
+      "sund_avg" = "sunshine duration",
       "sund_std" = "sunshine duration (std)",
       
       "sdbc_min" = "sunshine duration (min) bc",

@@ -95,7 +95,8 @@ plot_info <- list(
       "ref" = "solid",      # Solid line for observations or baseline
       "dry"  = "dashed",     # Dashed line for dry scenarios (clear but subtle)
       "wet"  = "dotted",     # Dot-dash line for wet scenarios (visibly distinct)
-      "Paris" = "dashed"  # Dashed line for Paris Agreement scenario
+      "Paris" = "dotdash",  # Dashed line for Paris Agreement scenario,
+      "CH2018" = "solid"  # Dotted line for CH2018 scenario
     ),
     shapes = c(
       "ref" = 16,           # Circle for reference
@@ -107,7 +108,8 @@ plot_info <- list(
       "ref" = "Reference",
       "dry" = "dry",
       "wet" = "wet",
-      "Paris" = "1.5°C"
+      "Paris" = "1.5°C",
+      "CH2018" = "CH2018"
     )
   ),
   horizon = list(

@@ -79,7 +79,7 @@ compute_relative_mean_knmi <- function(dt_mean, value_col, comparison_col, compa
   return(dt_mean)
 }
 
-compute_mean_diff_se <- function(
+compute_mean_diff_se_ch2018 <- function(
     dt, value_col, group_cols, linking_cols, comparison_col, comparison_ref,
     statistic = "mean", seasonal = FALSE, monthly = FALSE, half_year = FALSE
 ) {
@@ -456,7 +456,7 @@ plot_annual_horizon_boxplots <- function(dt, plot_dir, bsn, color_col, color_col
   
 }
 
-plot_annual_horizon_mean_diff_ch2018 <- function(knmi_dt, ch2018_dt, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text = "", y_lim = NULL, rel = FALSE, abs = FALSE) {
+plot_annual_horizon_mean_diff_ch2018 <- function(knmi_dt, ch2018_dt, plot_dir, bsn, color_col, color_col_levels, line_col, line_col_levels, comparison_ref, value_col, group_cols, stat, info_text = "", y_lim = NULL, rel = FALSE, abs = FALSE) {
   
   value_name <- plot_info$column_info$names[[value_col]]
   value_unit <- plot_info$column_info$units[[value_col]]
@@ -467,7 +467,7 @@ plot_annual_horizon_mean_diff_ch2018 <- function(knmi_dt, ch2018_dt, plot_dir, b
   
   if (rel) {
     stat_col <- paste0(stat_col, "_rel_diff")
-    info_text <- paste0(info_text, "change")
+    info_text <- paste0(info_text, "_rel")
     value_unit <- "[%]"
     y_text <- paste("change in", value_name, "[%]")
     
@@ -478,7 +478,7 @@ plot_annual_horizon_mean_diff_ch2018 <- function(knmi_dt, ch2018_dt, plot_dir, b
   
   if (abs) {
     stat_col <- paste0(stat_col, "_abs_diff")
-    info_text <- paste0(info_text, " change")
+    info_text <- paste0(info_text, "_abs")
     value_unit <- value_unit
     y_text <- paste("change in", value_name, value_unit)
     
@@ -500,6 +500,9 @@ plot_annual_horizon_mean_diff_ch2018 <- function(knmi_dt, ch2018_dt, plot_dir, b
   )]
   
   dt[, (color_col) := factor(get(color_col), levels = color_col_levels)]
+  color_labels <- c("L" = "Low/RCP2.6", "M" = "Moderate/RCP4.5", "H" = "High/RCP8.5")
+  dt[, (line_col) := factor(get(line_col), levels = line_col_levels)]
+  
   dt[, horizon := factor(horizon, levels = c("ref", "2033", "2050", "2100", "2150"),
                          labels = c("Ref", "2033", "2050", "2100", "2150"))]
   
@@ -515,16 +518,12 @@ plot_annual_horizon_mean_diff_ch2018 <- function(knmi_dt, ch2018_dt, plot_dir, b
   #dt[, x_facet := match(x_group_all, ref_levels), by = horizon]
   dt[, x_facet := match(x_group_all, ref_levels[ref_levels %in% x_group_all]), by = horizon]
   
-  # ref_q05 <- dt[get(color_col) == comparison_ref, median(.SD[[1]], na.rm = TRUE), .SDcols = stat_col]
-  # ref_q25 <- dt[get(color_col) == comparison_ref, quantile(.SD[[1]], probs = 0.25, na.rm = TRUE), .SDcols = stat_col]
-  # ref_q75 <- dt[get(color_col) == comparison_ref, quantile(.SD[[1]], probs = 0.75, na.rm = TRUE), .SDcols = stat_col]
-  
   # reduce spread
   box_width <- 0.6
   line_width <- 0.6
   
   # Plot annual boxplots
-  p <- ggplot(dt, aes(x = x_group_all, y = .data[[mean_col]], fill = .data[[color_col]]))
+  p <- ggplot(dt, aes(x = x_group_all, y = .data[[mean_col]], fill = .data[[color_col]], linetype = .data[[line_col]]))
   
   if (rel) {
     p <- p + geom_hline(yintercept = 0, linewidth = 0.3, color = "grey30")
@@ -552,8 +551,10 @@ plot_annual_horizon_mean_diff_ch2018 <- function(knmi_dt, ch2018_dt, plot_dir, b
           xend = x_facet + line_width / 2,
           y = .data[[mean_col]],
           yend = .data[[mean_col]],
-          color = .data[[color_col]]),
-      linewidth = 1.0
+          color = .data[[color_col]],
+          linetype = .data[[line_col]]
+          ),
+      linewidth = 1.5
     ) +
     # geom_errorbar(
     #   aes(x = as.numeric(factor(.data[[color_col]])),
@@ -569,7 +570,8 @@ plot_annual_horizon_mean_diff_ch2018 <- function(knmi_dt, ch2018_dt, plot_dir, b
       x = NULL,
       y = y_text,
       fill = NULL,
-      color = NULL
+      color = "Scenario",
+      linetype = "Variant"
     )  +
     custom_theme() +
     theme(
@@ -590,7 +592,8 @@ plot_annual_horizon_mean_diff_ch2018 <- function(knmi_dt, ch2018_dt, plot_dir, b
     ) +
     guides(
       fill = "none",
-      color = guide_legend(nrow = 1)
+      color = guide_legend(title.position = "left", nrow = 1, order = 1),
+      linetype = guide_legend(title.position = "left", nrow = 1, order = 2)
     ) +
     (if (!is.null(y_lim)) 
       ylim(y_lim) else NULL) +
@@ -600,7 +603,11 @@ plot_annual_horizon_mean_diff_ch2018 <- function(knmi_dt, ch2018_dt, plot_dir, b
     ) +
     scale_color_manual(
       values = plot_info[[color_col]]$colors,
-      labels = plot_info[[color_col]]$labels
+      labels = color_labels
+    ) +
+    scale_linetype_manual(
+      values = plot_info[[line_col]]$linetypes,
+      labels = plot_info[[line_col]]$labels
     )
   
   # Save the plot

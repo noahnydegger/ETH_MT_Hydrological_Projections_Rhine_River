@@ -164,7 +164,7 @@ plot_seasonality_ts <- function(
     aes(
       y = .data[[stat_col]],
       color = .data[[color_col]],
-      #linetype = .data[[line_col]],
+      linetype = .data[[line_col]],
       group = interaction(.data[[color_col]], .data[[line_col]])
     ),
     linewidth = 2
@@ -175,29 +175,33 @@ plot_seasonality_ts <- function(
       subtitle = subtitle_text,
       x = "Month",
       y = paste(value_name, value_unit),
-      color = "Type",
-      #linetype = "Variant",
+      color = "Scenario",
+      linetype = "Variant",
       fill = paste0(q_bot * 100, "-", q_top * 100, " % Quantile")
     ) +
     custom_theme() +
     theme(
       legend.position = "top",
       legend.key.width = unit(2, "cm"),  # Adjust to your liking (default ~1.2cm)
+      panel.grid.major.y = element_line(size = 0.2, linetype = 'dotted', colour = "grey70"),
+      panel.grid.minor.y = element_line(size = 0.2, linetype = 'dotted', colour = "grey80"),
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor.x = element_blank(),
       axis.title.x = element_blank()  # Remove the x-axis title
     ) +
     scale_color_manual(
       values = plot_info[[color_col]]$colors,
       labels = plot_info[[color_col]]$labels
     ) +
-    # scale_linetype_manual(
-    #   values = plot_info[[line_col]]$linetypes,
-    #   labels = plot_info[[line_col]]$labels
-    # ) +
-    guides(
-      color = guide_legend(title.position = "left", nrow = 1)
-      #linetype = guide_legend(title.position = "left", nrow = 1)
+    scale_linetype_manual(
+      values = plot_info[[line_col]]$linetypes,
+      labels = plot_info[[line_col]]$labels
     ) +
-    #ylim(450, 1450) +
+    guides(
+      color = guide_legend(title.position = "left", nrow = 1, order = 1),
+      linetype = guide_legend(title.position = "left", nrow = 1, order = 2)
+    ) +
+    ylim(450, 1450) +
     (if (show_range) scale_fill_manual(
       values = plot_info[[color_col]]$colors,
       labels = plot_info[[color_col]]$labels
@@ -340,8 +344,10 @@ plot_seasonality_ts_combination <- function(
       legend.background = element_rect(fill = "transparent", colour = NA),
       #legend.text = element_text(size = 8),
       panel.background = element_rect(fill = "white", colour = "grey96"),
-      panel.grid.major = element_line(size = 0.2, linetype = 'dotted', colour = "grey80"),
-      panel.grid.minor = element_line(size = 0.2, linetype = 'dotted', colour = "grey80"),
+      panel.grid.major.y = element_line(size = 0.2, linetype = 'dotted', colour = "grey70"),
+      panel.grid.minor.y = element_line(size = 0.2, linetype = 'dotted', colour = "grey80"),
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor.x = element_blank(),
       axis.line.x = element_line(colour = "black", size = 0.3),
       axis.line.y = element_line(colour = "black", size = 0.3),
       #axis.title = element_text(size = 10),

@@ -85,27 +85,50 @@ compute_mean_diff_se <- function(
 ) {
   
   stat_col <- value_col # paste0(value_col, "_", statistic) #value_col # 
+  
+  dt[, YYYY := year(date)]
+  dt[, MM := month(date)]
+  
+  # Determine grouping
+  if (monthly) {
+    group_vars <- c("MM", group_cols)
+    linking_vars <- c("MM", linking_cols)
+  } else if (seasonal) {
+    dt[, season := fifelse(MM %in% c(12,1,2), "DJF",
+                           fifelse(MM %in% c(3,4,5), "MAM",
+                                   fifelse(MM %in% c(6,7,8), "JJA", "SON")))]
+    group_vars <- c("season", group_cols)
+    linking_vars <- c("season", linking_cols)
+  } else if (half_year) {
+    dt[, season := fifelse(MM %in% c(5,6,7,8,9,10), "summer", "winter")]
+    group_vars <- c("season", group_cols)
+    linking_vars <- c("season", linking_cols)
+  } else {
+    group_vars <- group_cols
+    linking_vars <- linking_cols
+  }
+  
   # Step 1: Aggregate to annual mean per group
   dt_agg <- dt[, .(
     mean_val = mean(get(stat_col), na.rm = TRUE),
     sd_val = sd(get(stat_col), na.rm = TRUE),
     n = .N
-  ), by = group_cols]
+  ), by = group_vars]
   
   # Step 2: Split into reference and comparison groups
   ref_dt <<- dt_agg[get(comparison_col) == comparison_ref]
   fut_dt <<- dt_agg[get(comparison_col) != comparison_ref]
   
   # Step 2a: Rename columns in ref_dt with `_ref` suffix (except for linking columns)
-  cols_to_rename <- setdiff(names(ref_dt), linking_cols)
+  cols_to_rename <- setdiff(names(ref_dt), linking_vars)
   setnames(ref_dt, cols_to_rename, paste0(cols_to_rename, "_ref"))
   
   # Step 3: Set keys for joining
-  setkeyv(ref_dt, linking_cols)
-  setkeyv(fut_dt, linking_cols)
+  setkeyv(ref_dt, linking_vars)
+  setkeyv(fut_dt, linking_vars)
   
   # Step 4: Join and compute difference + standard error
-  dt_diff <- fut_dt[ref_dt, on = linking_cols, nomatch = 0L]
+  dt_diff <- fut_dt[ref_dt, on = linking_vars, nomatch = 0L]
   
   # Add columns
   dt_diff[, mean_ref := mean_val_ref]
@@ -415,7 +438,7 @@ plot_annual_horizon_boxplots <- function(dt, plot_dir, bsn, color_col, color_col
   
 }
 
-plot_annual_horizon_mean_diff <- function(dt, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text = "", y_lim = NULL, rel = FALSE, abs = FALSE) {
+plot_annual_horizon_mean_diff <- function(dt, plot_dir, bsn, color_col, color_col_levels, line_col, line_col_levels, comparison_ref, value_col, group_cols, stat, info_text = "", y_lim = NULL, rel = FALSE, abs = FALSE) {
   
   value_name <- plot_info$column_info$names[[value_col]]
   value_unit <- plot_info$column_info$units[[value_col]]
@@ -426,7 +449,7 @@ plot_annual_horizon_mean_diff <- function(dt, plot_dir, bsn, color_col, color_co
   
   if (rel) {
     stat_col <- paste0(stat_col, "_rel_diff")
-    info_text <- paste0(info_text, "change")
+    info_text <- paste0(info_text, "_rel")
     value_unit <- "[%]"
     y_text <- paste("change in", value_name, "[%]")
     
@@ -437,7 +460,7 @@ plot_annual_horizon_mean_diff <- function(dt, plot_dir, bsn, color_col, color_co
   
   if (abs) {
     stat_col <- paste0(stat_col, "_abs_diff")
-    info_text <- paste0(info_text, " change")
+    info_text <- paste0(info_text, "_abs")
     value_unit <- value_unit
     y_text <- paste("change in", value_name, value_unit)
     
@@ -452,21 +475,17 @@ plot_annual_horizon_mean_diff <- function(dt, plot_dir, bsn, color_col, color_co
   )]
   
   dt[, (color_col) := factor(get(color_col), levels = color_col_levels)]
+  dt[, (line_col) := factor(get(line_col), levels = line_col_levels)]
   dt[, horizon := factor(horizon, levels = c("ref", "2033", "2050", "2100", "2150"),
                          labels = c("Ref", "2033", "2050", "2100", "2150"))]
   
   dt[, x_facet := match(get(color_col), levels(get(color_col))[levels(get(color_col)) %in% get(color_col)]), by = horizon]
   
-  # ref_q05 <- dt[get(color_col) == comparison_ref, median(.SD[[1]], na.rm = TRUE), .SDcols = stat_col]
-  # ref_q25 <- dt[get(color_col) == comparison_ref, quantile(.SD[[1]], probs = 0.25, na.rm = TRUE), .SDcols = stat_col]
-  # ref_q75 <- dt[get(color_col) == comparison_ref, quantile(.SD[[1]], probs = 0.75, na.rm = TRUE), .SDcols = stat_col]
-  
-  # reduce spread
   box_width <- 0.6
   line_width <- 0.6
   
   # Plot annual boxplots
-  p <- ggplot(dt, aes(x = .data[[color_col]], y = .data[[mean_col]], fill = .data[[color_col]]))
+  p <- ggplot(dt, aes(x = .data[[color_col]], y = .data[[mean_col]], fill = .data[[color_col]], linetype = .data[[line_col]]))
   
   if (rel) {
     p <- p + geom_hline(yintercept = 0, linewidth = 0.3, color = "grey30")
@@ -478,25 +497,26 @@ plot_annual_horizon_mean_diff <- function(dt, plot_dir, bsn, color_col, color_co
   }
   
   p <- p + 
-    #geom_boxplot(width = 0.6, outlier.size = 0.5) +
     
-    geom_rect(
-      aes(xmin = x_facet - box_width / 2,
-          xmax = x_facet + box_width / 2,
-          ymin = min_val,
-          ymax = max_val,
-          fill = .data[[color_col]]),
-      alpha = 0.4,
-      color = NA  # no border
-    ) +
+    # geom_rect(
+    #   aes(xmin = x_facet - box_width / 2,
+    #       xmax = x_facet + box_width / 2,
+    #       ymin = min_val,
+    #       ymax = max_val,
+    #       fill = .data[[color_col]]),
+    #   alpha = 0.4,
+    #   color = NA  # no border
+    # ) +
     
     geom_segment(
       aes(x = x_facet - line_width / 2,
           xend = x_facet + line_width / 2,
           y = .data[[mean_col]],
           yend = .data[[mean_col]],
-          color = .data[[color_col]]),
-      linewidth = 1.0
+          color = .data[[color_col]],
+          linetype = .data[[line_col]]
+          ),
+      linewidth = 1.5
     ) +
     # geom_errorbar(
     #   aes(x = as.numeric(factor(.data[[color_col]])),
@@ -512,12 +532,13 @@ plot_annual_horizon_mean_diff <- function(dt, plot_dir, bsn, color_col, color_co
       x = NULL,
       y = y_text,
       fill = NULL,
-      color = NULL
+      color = "Scenario",
+      linetype = "Variant"
     )  +
     custom_theme() +
     theme(
       legend.position = "top",
-      legend.key.width = unit(1.5, "cm"),
+      legend.key.width = unit(2.0, "cm"),
       strip.placement = "outside",
       strip.background = element_blank(),
       panel.background = element_rect(fill = "white", colour = NA),
@@ -533,7 +554,8 @@ plot_annual_horizon_mean_diff <- function(dt, plot_dir, bsn, color_col, color_co
     ) +
     guides(
       fill = "none",
-      color = guide_legend(nrow = 1)
+      color = guide_legend(title.position = "left", nrow = 1, order = 1),
+      linetype = guide_legend(title.position = "left", nrow = 1, order = 2)
     ) +
     (if (!is.null(y_lim)) 
       ylim(y_lim) else NULL) +
@@ -544,6 +566,10 @@ plot_annual_horizon_mean_diff <- function(dt, plot_dir, bsn, color_col, color_co
     scale_color_manual(
       values = plot_info[[color_col]]$colors,
       labels = plot_info[[color_col]]$labels
+    ) +
+    scale_linetype_manual(
+      values = plot_info[[line_col]]$linetypes,
+      labels = plot_info[[line_col]]$labels
     )
   
   # Save the plot
@@ -801,6 +827,119 @@ plot_seasonal_boxplots <- function(dt_seasonal, plot_dir, bsn, color_col, color_
   # Save the plot
   save_dir <- file.path(plot_dir, "seasonal_boxplots", value_col)
   filename <- paste0("seasonal_", bsn, "_", stat_col, info_text, ".pdf")
+  save_plot(p, save_dir, filename, width = 10, height = 6)
+}
+
+plot_seasonal_mean_diff <- function(dt, plot_dir, bsn, color_col, color_col_levels, line_col, line_col_levels, value_col, group_cols, stat, info_text = "", y_lim = NULL, rel = FALSE) {
+  
+  value_name <- plot_info$column_info$names[[value_col]]
+  value_unit <- plot_info$column_info$units[[value_col]]
+  
+  if (rel) {
+    info_text <- paste0(info_text, "_rel")
+    value_unit <- "[%]"
+    y_text <- paste("change in", value_name, "[%]")
+    
+    mean_col <- "mean_diff_rel"
+    se_col <- "se_diff_rel"
+  } else {
+    info_text <- paste0(info_text, "_abs")
+    y_text <- paste("change in", value_name, value_unit)
+    mean_col <- "mean_diff_abs"
+    se_col <- "se_diff_abs"
+  }
+  
+  dt[, `:=`(
+    min_val = get(mean_col) - get(se_col),
+    max_val = get(mean_col) + get(se_col)
+  )]
+  
+  dt[, (color_col) := factor(get(color_col), levels = color_col_levels)]
+  
+  # Define season as factor with desired order
+  dt[, season := factor(season, levels = c("DJF", "MAM", "JJA", "SON"))]
+  
+  box_width <- 0.6
+  line_width <- 0.6
+  
+  # Plot seasonal mean differences
+  p <- ggplot(dt, aes(x = season, y = .data[[mean_col]], fill = .data[[color_col]], linetype = .data[[line_col]]))
+  
+  if (rel) {
+    p <- p + geom_hline(yintercept = 0, linewidth = 0.3, color = "grey30")
+  }
+  
+  p <- p + 
+    
+    # geom_rect(
+    #   aes(xmin = as.numeric(season) - box_width / 2,
+    #       xmax = as.numeric(season) + box_width / 2,
+    #       ymin = min_val,
+    #       ymax = max_val,
+    #       fill = .data[[color_col]]),
+    #   alpha = 0.4,
+    #   color = NA  # no border
+    # ) +
+    
+    geom_segment(
+      aes(x = as.numeric(season) - line_width / 2,
+          xend = as.numeric(season) + line_width / 2,
+          y = .data[[mean_col]],
+          yend = .data[[mean_col]],
+          color = .data[[color_col]],
+          linetype = .data[[line_col]]
+      ),
+      linewidth = 1.5
+    ) +
+  
+    labs(
+      title = NULL, #paste("Seasonal", stat, value_name, bsn, info_text),
+      x = NULL, #"Season",
+      y = y_text,
+      fill = NULL, #"Dataset",
+      color = NULL,
+      linetype = NULL
+    ) +
+    custom_theme() +
+    theme(
+      legend.position = "top",
+      legend.key.width = unit(1.5, "cm"),
+      #axis.text.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      panel.grid.major.y = element_line(size = 0.3, linetype = 'dotted', colour = "grey80"),
+      panel.grid.minor.y = element_blank(),
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor.x = element_blank(),
+      legend.direction = "horizontal",
+      legend.box = "horizontal"
+    ) +
+    guides(
+      fill = "none",
+      color = guide_legend(nrow = 1, order = 1),
+      linetype = guide_legend(nrow = 1, order = 2)
+    ) +
+    (if (!is.null(y_lim)) 
+      ylim(y_lim) else NULL) +
+    scale_fill_manual(
+      values = plot_info[[color_col]]$colors,
+      labels = plot_info[[color_col]]$labels
+    ) +
+    scale_color_manual(
+      values = plot_info[[color_col]]$colors,
+      labels = plot_info[[color_col]]$labels
+    ) +
+    scale_linetype_manual(
+      values = plot_info[[line_col]]$linetypes,
+      labels = plot_info[[line_col]]$labels
+    ) +
+    scale_x_continuous(
+      breaks = 1:4,
+      labels = levels(dt$season)
+    )
+  
+  # Save the plot
+  save_dir <- file.path(plot_dir, "seasonal_mean_se", value_col)
+  filename <- paste0("seasonal_mean_diff", bsn, "_", value_col, info_text, ".pdf")
   save_plot(p, save_dir, filename, width = 10, height = 6)
 }
 

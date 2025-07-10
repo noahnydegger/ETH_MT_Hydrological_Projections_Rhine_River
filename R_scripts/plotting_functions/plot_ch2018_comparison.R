@@ -492,7 +492,7 @@ plot_annual_horizon_mean_diff_ch2018 <- function(knmi_dt, ch2018_dt, plot_dir, b
   ch2018_dt[, dataset := "CH2018"]
   dt <<- rbind(knmi_dt, ch2018_dt, fill = TRUE)
   
-  dt <- dt[!is.na(horizon) & horizon != "2150"]
+  #dt <- dt[!is.na(horizon) & horizon != "2150"]
   
   dt[, `:=`(
     min_val = get(mean_col) - get(se_col),

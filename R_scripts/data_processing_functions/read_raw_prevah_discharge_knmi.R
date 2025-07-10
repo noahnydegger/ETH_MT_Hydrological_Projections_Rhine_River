@@ -6,7 +6,7 @@ library(data.table)
 # project directory
 home_dir <- file.path(here::here())
 
-run_type <- "future_V1"
+run_type <- "no_sund_bc"
 
 # input directories
 input_dir_knmi <- file.path(home_dir, "Data", "Rheinblick2027", "raw_prevah_output", paste0("routing", "_", run_type))
@@ -45,11 +45,7 @@ all_scenario_horizons <- c(
 )
 
 scenario_horizons <- c(
-  "Hd_2050", "Hd_2100", "Hd_2150",
-  "Hn_2050", "Hn_2100", "Hn_2150",
-  "Md_2050", "Md_2100", "Md_2150",
-  "Mn_2050", "Mn_2100", "Mn_2150",
-  "Ld_2100", "Ln_2100"
+  "reference"
 )
 # "Hd_2150" problem with ens 4 Swissrhine
 

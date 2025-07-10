@@ -11,16 +11,16 @@ info_text = ""
 #info_text = "sund_bc"
   
 # select the dataset to plot: mit_output, meteo_stat, discharge, lakelevel, meteo_input, meteo_sund
-dataset <- "discharge"
+dataset <- "meteo_input"
 
 plot_selection <- c(
-  "seasonality" = TRUE,
+  "seasonality" = FALSE,
   "seasonality_horizon" = FALSE,
   "annual_horizon_mean_diff" = FALSE,
+  "annual_horizon_mean_diff_combination" = TRUE,
   "CH2018_annual_comparison" = FALSE,
   "annual_boxplot" = FALSE,
   "annual_horizon_boxplot" = FALSE,
-  "annual_horizon_boxplot_combination" = FALSE,
   "seasonal_boxplot" = FALSE,
   "seasonal_mean_diff" = FALSE,
   "monthly_boxplot" = FALSE,
@@ -62,7 +62,7 @@ scen_var_hor_sel <- c("observation_observation_observation", "hindcast_hindcast_
 # )
 
 horizon_sel <- c("observation", "hindcast", "ref", "2033", "2050", "2100", "2150")
-horizon_sel <- c("ref", "2100")#, "2050", "2100", "2150")
+#horizon_sel <- c("ref", "2100")#, "2050", "2100", "2150")
 
 run_type_sel <- c("future_V1", "hindcast", "observation", "no_sund_bc", "sund_bc")
 
@@ -81,8 +81,11 @@ color_col <- "scenario"
 color_col_levels <- c("ref", "L", "M", "H")
 #scen_var_hor_sel <- c("ref_ref_ref", "L_Paris_2033", "H_wet_2150", "H_dry_2150")
 
-#color_col <- "run_type"
-#color_col_levels <- c("observation", "hindcast", "sund_bc", "no_sund_bc", "future_V1")
+color_col <- "run_type"
+color_col_levels <- c("observation", "hindcast", "future_V1", "sund_bc", "no_sund_bc")
+
+#color_col <- "horizon"
+#color_col_levels <- c("observation", "hindcast", "ref", "2033", "2050", "2100", "2150")
 
 comparison_ref = "ref"
 
@@ -99,7 +102,7 @@ if (dataset == "mit_output") {
   
 } else if (dataset == "discharge") {
   basin_sel <- unique(knmi_discharge_dt$station)
-  basin_sel <- c("Basel Rheinhalle")#, "Aare_Thun", "Andelfingen", "Diepoldsau", "Rhine_Neuhausen", "Rekingen", "Aare_Thun", "Aare_Untersiggenthal", "Limmatt_Baden", "Mellingen")#, "Limmatt_Baden", "Reuss_Luzern", "Bruegg-Aegerten", "Aare_Untersiggenthal")
+  basin_sel <- c("Basel Rheinhalle", "Andelfingen", "Rhine_Neuhausen", "Diepoldsau", "Aare_Untersiggenthal", "Aare_Thun")#, "Rekingen", "Aare_Thun", "Limmatt_Baden", "Mellingen")#, "Limmatt_Baden", "Reuss_Luzern", "Bruegg-Aegerten", "Aare_Untersiggenthal")
   value_cols <- c("discharge")
   dt_dataset <- knmi_discharge_dt
   setnames(dt_dataset, old = "station", new = "basin", skip_absent = TRUE)
@@ -174,7 +177,7 @@ if (plot_selection["seasonality"]) {
         
         info_col <- sub("rm_", "", value_col)
         
-        plot_seasonality_ts(dt, plot_dir, bsn, info_col, color_col, color_col_levels, line_col, line_col_levels, value_col, color_col, comparison_ref, stat, info_text, 
+        plot_seasonality_ts(dt, plot_dir, bsn, info_col, color_col, color_col_levels, line_col, line_col_levels, value_col, color_col, comparison_ref, stat, info_text,
                             q_bot, q_top, show_ensemble = show_ensemble, show_range = show_range, gof_pairs = gof_pairs)
 
       } # value_col loop
@@ -255,6 +258,21 @@ if (plot_selection["annual_horizon_mean_diff"]) {
   } # basin loop
 } # annual horizon mean diff plot
 
+# annual horizon combination boxplot ------------------------------------------------------
+if (plot_selection["annual_horizon_mean_diff_combination"]) {
+  
+  source(here("R_scripts", "plotting_functions", "plot_boxplots.R"))
+  
+  # generate annual boxplots
+  for (bsn in basin_sel) {
+    dt <- dt_subset[basin == bsn]
+    cat("Plotting annual mean diff horizon for", bsn, "tair_prec mean", "\n")
+    
+    combined_annual_horizon_mean_diff(dt, plot_dir, bsn)
+    
+  } # basin loop
+} # annual horizon boxplot combination
+
 # ch2018 annual comparison ------------------------------------------------------
 if (plot_selection["CH2018_annual_comparison"]) {
   
@@ -266,26 +284,26 @@ if (plot_selection["CH2018_annual_comparison"]) {
   # setnames(ch2018_dt, old = "station", new = "basin", skip_absent = TRUE)
   # 
   # # Extract unique horizons and remove "ref"
-  # horizons <- setdiff(unique(knmi_dt$horizon), c("ref", "hindcast", "observation"))
-  # horizons_num <- as.integer(horizons[grepl("^\\d{4}$", horizons)])
-  # 
-  # # Extract year from date
-  # ch2018_dt[, year := as.integer(format(date, "%Y"))]
-  # 
-  # # Initialize column
-  # ch2018_dt[, horizon := NA_character_]
-  # 
-  # # Assign numeric horizons by ±15-year range
-  # for (h in horizons_num) {
-  #   ch2018_dt[year >= h - 14 & year <= h + 15, horizon := as.character(h)]
-  # }
-  # 
-  # # Treat "ref" separately (e.g., 1981–2010)
-  # ch2018_dt[year >= 1981 & year <= 2010, horizon := "ref"]
-  # 
-  # # Clean up
-  # ch2018_dt[, year := NULL]
-  # ch2018_dt <- ch2018_dt[!is.na(horizon)]
+  horizons <- setdiff(unique(knmi_dt$horizon), c("ref", "hindcast", "observation"))
+  horizons_num <- as.integer(horizons[grepl("^\\d{4}$", horizons)])
+
+  # Extract year from date
+  ch2018_dt[, year := as.integer(format(date, "%Y"))]
+
+  # Initialize column
+  ch2018_dt[, horizon := NA_character_]
+
+  # Assign numeric horizons by ±15-year range
+  for (h in horizons_num) {
+    ch2018_dt[year >= h - 14 & year <= h + 15, horizon := as.character(h)]
+  }
+
+  # Treat "ref" separately (e.g., 1981–2010)
+  ch2018_dt[year >= 1981 & year <= 2010, horizon := "ref"]
+
+  # Clean up
+  ch2018_dt[, year := NULL]
+  ch2018_dt <- ch2018_dt[!is.na(horizon)]
   # 
   # # Map RCP values to scenario codes
   # ch2018_dt[, scenario := fifelse(rcp == "RCP85", "H",
@@ -293,7 +311,7 @@ if (plot_selection["CH2018_annual_comparison"]) {
   #                                         fifelse(rcp == "RCP26", "L", NA_character_)))]
   # ch2018_dt[, variant := "CH2018"]
   
-  knmi_dt <- knmi_dt[as.numeric(format(date, "%Y")) < 2100]
+  knmi_dt <- knmi_dt[as.numeric(format(date, "%Y")) < 2100 | as.numeric(format(date, "%Y")) > 2115]
   
   group_cols_knmi <- c("basin", "scenario", "variant", "horizon", "scen_var", "scen_var_hor", "hydro_model", "run_type")
   linking_cols_knmi <- c("basin", "run_type")
@@ -313,8 +331,8 @@ if (plot_selection["CH2018_annual_comparison"]) {
   line_col <- "variant"
   line_col_levels <- c("ref", "wet", "dry", "Paris", "CH2018")
   
-  info_text <- "_1981_2010_15"
-  y_lim <- NULL #c(-30, 22)
+  info_text <- "_1981_2010_15_ylim_2150"
+  y_lim <- c(-30, 22)
   
   statistics <- c("mean")#, "min", "max", "7day_low")#, "min", "max", "7day_low")
   source(here("R_scripts", "plotting_functions", "plot_ch2018_comparison.R"))
@@ -395,21 +413,6 @@ if (plot_selection["annual_horizon_boxplot"]) {
     } # column loop
   } # basin loop
 } # annual horizon boxplot plot
-
-# annual horizon combination boxplot ------------------------------------------------------
-if (plot_selection["annual_horizon_boxplot_combination"]) {
-  
-  source(here("R_scripts", "plotting_functions", "plot_boxplots.R"))
-  
-  # generate annual boxplots
-  for (bsn in basin_sel) {
-    dt <- dt_subset[basin == bsn]
-      cat("Plotting annual boxplot for", bsn, "tair_prec mean", "\n")
-      
-      combined_annual_horizon_boxplot(dt, plot_dir, bsn)
-      
-  } # basin loop
-} # annual horizon boxplot combination
 
 # seasonal boxplot plot ------------------------------------------------------
 if (plot_selection["seasonal_boxplot"]) {
@@ -598,7 +601,6 @@ if (plot_selection["seasonal_bar"]) {
   group_cols <- c("basin", "horizon", "scenario", "scen_var", "scen_var_hor", "hydro_model", "run_type")
   
   comparison_col <- "scen_var_hor"
-  comparison_ref <- "ref_ref_ref"
   
   q_bot <- 0.05
   q_top <- 0.95
@@ -608,13 +610,15 @@ if (plot_selection["seasonal_bar"]) {
     for (value_col in value_cols) {
       if (all(is.na(dt[[value_col]]))) next
       cat("Plotting seasonal bar plot for", bsn, value_col, "\n")
-      
+      comparison_ref <- "observation_observation_observation"
       dt_dpy <- compute_number_of_days(dt, bsn, group_cols, value_col, comparison_col, comparison_ref, q_bot, q_top)
+      combined_bar_plot_season(dt_dpy, plot_dir, bsn, q_bot, q_top, time_period="ref")
+      
+      comparison_ref <- "ref_ref_ref"
+      #dt_dpy <- compute_number_of_days(dt, bsn, group_cols, value_col, comparison_col, comparison_ref, q_bot, q_top)
+      #combined_bar_plot_season(dt_dpy, plot_dir, bsn, q_bot, q_top, time_period="future")
       
       #plot_seasonal_bars_with_error(dt_dpy, plot_dir, bsn, color_col, color_col_levels, value_col, group_cols, info_text = info_text, rel = FALSE)
-      
-      #combined_bar_plot_season(dt_dpy, plot_dir, bsn, q_bot, q_top, time_period="ref")
-      combined_bar_plot_season(dt_dpy, plot_dir, bsn, q_bot, q_top, time_period="future")
     } # column loop
   } # basin loop
 } # seasonal bar plot

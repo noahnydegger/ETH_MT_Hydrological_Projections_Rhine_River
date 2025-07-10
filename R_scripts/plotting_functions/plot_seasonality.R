@@ -169,13 +169,13 @@ plot_seasonality_ts <- function(
     ),
     linewidth = 2
   ) +
-    scale_x_date(date_labels = "%b", breaks = month_labels, expand = c(0, 0)) + # c("J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D")
+    scale_x_date(date_labels = c("J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"), breaks = month_labels, expand = c(0, 0)) + # c("J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D") or "%b"
     labs(
       title = NULL, # paste("30-day Moving Average", value_name, bsn, info_text),
       subtitle = subtitle_text,
       x = "Month",
       y = paste(value_name, value_unit),
-      color = "Scenario",
+      color = NULL, #"Scenario",
       linetype = "Variant",
       fill = paste0(q_bot * 100, "-", q_top * 100, " % Quantile")
     ) +
@@ -199,9 +199,9 @@ plot_seasonality_ts <- function(
     ) +
     guides(
       color = guide_legend(title.position = "left", nrow = 1, order = 1),
-      linetype = guide_legend(title.position = "left", nrow = 1, order = 2)
+      linetype = "none",#guide_legend(title.position = "left", nrow = 1, order = 2)
     ) +
-    ylim(450, 1450) +
+    #ylim(650, 1550) + #450 - 1450
     (if (show_range) scale_fill_manual(
       values = plot_info[[color_col]]$colors,
       labels = plot_info[[color_col]]$labels

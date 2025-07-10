@@ -38,7 +38,7 @@ all_run_types <- c(
   "future_V1"
 )
 run_type_sel <- c("sund_bc", "with_glac_sdbc")
-run_type_sel <- c("bservation", "indcast", "future_V1") # selected run types
+run_type_sel <- c("bservation", "indcast", "future_V1", "no_sund_bc") # selected run types
 
 basin_sel <- c("RhB200", "RhD200", "RhN200", "RhR200", "AaU200", "ThS200", "Thu200", "TGl200", "HiR200", "VoR200", "Bod400")  # MT_sel
 station_sel <- c("Basel Rheinhalle", "Diepoldsau", "Rhine_Neuhausen", "Rekingen", "Aare_Untersiggenthal", 
@@ -80,7 +80,7 @@ ch2018_variables <- list(
                            read_dir = file.path(home_dir, "Data", "Rheinblick2027", "ch2018", "ch2018_glacier.rds")),
   
   ch2018_discharge_dt = list(read = FALSE, read_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "prevah_discharge_ch2018_MT_sel.rds"),
-                           combine = TRUE, combine_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "discharge", "CH2018"))
+                           combine = FALSE, combine_dir = file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "discharge", "CH2018"))
 )
 
 # functions ----------------------------------------------------------------
@@ -208,3 +208,16 @@ read_variables_from_list(ch2018_variables)
 combine_rds_scenario_data(knmi_variables)
 combine_rds_scenario_data(ch2018_variables)
 
+
+# no_bc_discharge_dt <- readRDS(file.path(home_dir, "Data", "Rheinblick2027", "processed_prevah_output", "discharge", "no_sund_bc", "Reference_no_sund_bc.rds"))
+# 
+# setnames(no_bc_discharge_dt, old = "basin", new = "station", skip_absent = TRUE)
+# 
+# csv_path <- sub("\\.rds$", ".csv", knmi_variables$knmi_discharge_dt$read_dir)
+# 
+# knmi_discharge_dt <- fread(csv_path)
+# 
+# knmi_discharge_dt <- data.table::rbindlist(list(knmi_discharge_dt, no_bc_discharge_dt), use.names = TRUE)
+# 
+# saveRDS(knmi_discharge_dt, file = knmi_variables$knmi_discharge_dt$read_dir)
+# data.table::fwrite(knmi_discharge_dt, file = sub("\\.rds$", ".csv", knmi_variables$knmi_discharge_dt$read_dir))

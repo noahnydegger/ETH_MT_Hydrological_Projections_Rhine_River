@@ -260,26 +260,33 @@ plot_annual_boxplots <- function(dt_annual, plot_dir, bsn, color_col, color_col_
   p <- ggplot(dt_annual, aes(x = .data[[color_col]], y = .data[[stat_col]], fill = .data[[color_col]])) +
     geom_boxplot(position = position_dodge(width = 0.8), fatten = 2, size = 0.8) +  
     labs(
-      title = paste("Annual", stat, value_name, bsn, info_text),
+      title = NULL, #paste("Annual", stat, value_name, bsn, info_text),
       x = "Dataset",
       y = y_text,
-      fill = "Dataset"
+      fill = NULL #"Dataset"
     )  +
     custom_theme() +
     theme(
-      axis.title.x = element_blank()  # Remove the x-axis title
+      axis.title.x = element_blank(),  # Remove the x-axis title
+      axis.line.x = element_blank(),
+      axis.line.y = element_blank(),
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor.x = element_blank()
     ) +
     scale_fill_manual(
       values = plot_info[[color_col]]$colors,
       labels = plot_info[[color_col]]$labels
     ) +
-    #ylim(0.0, 0.7) +
+    guides(
+      fill = "none"#guide_legend(title.position = "left", nrow = 1, order = 1),
+    ) +
+    #ylim(200, 2000) +
     scale_x_discrete(labels = NULL)  
   
   # Save the plot
   save_dir <- file.path(plot_dir, "annual_boxplots", value_col)
   filename <- paste0("annual_", bsn, "_", stat_col, info_text, ".pdf")
-  save_plot(p, save_dir, filename, width = 8, height = 6)
+  save_plot(p, save_dir, filename, width = 6, height = 6)
   
 }
 
@@ -579,7 +586,7 @@ plot_annual_horizon_mean_diff <- function(dt, plot_dir, bsn, color_col, color_co
   
 }
 
-plot_annual_horizon_boxplots_combination <- function(dt, plot_dir, bsn, color_col, value_col, stat, y_lim = NULL, rel = FALSE, abs = FALSE,
+plot_annual_horizon_mean_diff_combination <- function(dt, plot_dir, bsn, color_col, line_col, value_col, stat, y_lim = NULL, rel = FALSE, abs = FALSE,
                                                      title, legend, y_label) {
   
   value_name <- plot_info$column_info$names[[value_col]]
@@ -623,7 +630,7 @@ plot_annual_horizon_boxplots_combination <- function(dt, plot_dir, bsn, color_co
   # Legend logic
   legend_theme <- if (legend) {
     theme(
-      legend.position = c(1, 1.13),
+      legend.position = c(1, 1.18),
       legend.justification = "right"
     )
   } else {
@@ -634,7 +641,7 @@ plot_annual_horizon_boxplots_combination <- function(dt, plot_dir, bsn, color_co
   line_width <- 0.6
   
   # Plot annual boxplots
-  p <- ggplot(dt, aes(x = .data[[color_col]], y = .data[[mean_col]], fill = .data[[color_col]]))
+  p <- ggplot(dt, aes(x = x_facet, y = .data[[mean_col]], fill = .data[[color_col]])) # , linetype = .data[[line_col]]
   
   if (rel) {
     p <- p + geom_hline(yintercept = 0, linewidth = 0.3, color = "grey50")
@@ -658,21 +665,25 @@ plot_annual_horizon_boxplots_combination <- function(dt, plot_dir, bsn, color_co
           xend = x_facet + line_width / 2,
           y = .data[[mean_col]],
           yend = .data[[mean_col]],
-          color = .data[[color_col]]),
-      linewidth = 1.0
+          color = .data[[color_col]]
+          #linetype = .data[[line_col]]
+          ),
+      linewidth = 1.5
     ) +
     
     facet_grid(~ horizon, scales = "free_x", space = "free_x", switch = "x") +
     labs(
-      title = title,# paste("Annual", stat, value_name, bsn, info_text),
+      title = title,
       x = NULL,
       y = ylab,
       fill = NULL,
-      color = NULL
+      color = NULL #"Scenario"
+      #linetype = "Variant"
     ) +
     custom_theme() +
     legend_theme +
     theme(
+      legend.key.width = unit(1.5, "cm"),
       strip.placement = "outside",
       strip.background = element_blank(),
       axis.text.x = element_blank(),
@@ -699,7 +710,8 @@ plot_annual_horizon_boxplots_combination <- function(dt, plot_dir, bsn, color_co
     ) +
     guides(
       fill = "none",
-      color =  guide_legend(nrow = 1)
+      color = guide_legend(title.position = "left", nrow = 1, order = 1),
+      linetype = "none" #guide_legend(title.position = "left", nrow = 1, order = 2)
     ) +
     scale_fill_manual(
       values = plot_info[[color_col]]$colors,
@@ -707,7 +719,11 @@ plot_annual_horizon_boxplots_combination <- function(dt, plot_dir, bsn, color_co
     ) +
     scale_color_manual(
       values = plot_info[[color_col]]$colors,
-      labels = plot_info[[color_col]]$labels
+      labels = c("ref_ref" = "ref","L_Paris" = "L 1.5°C", "L_wet" = "L wet", "L_dry" = "L dry", "M_wet" = "M wet", "M_dry" = "M dry", "H_wet" = "H wet", "H_dry" = "H dry")
+    ) +
+    scale_linetype_manual(
+      values = plot_info[[line_col]]$linetypes,
+      labels = plot_info[[line_col]]$labels
     )
   
   if (!is.null(y_lim)) {
@@ -718,7 +734,7 @@ plot_annual_horizon_boxplots_combination <- function(dt, plot_dir, bsn, color_co
   
 }
 
-combined_annual_horizon_boxplot <- function(dt, plot_dir, bsn) {
+combined_annual_horizon_mean_diff <- function(dt, plot_dir, bsn) {
 
   titles <- c(
     paste0("(a) temperature"),
@@ -734,6 +750,12 @@ combined_annual_horizon_boxplot <- function(dt, plot_dir, bsn) {
   
   color_col <- "scen_var"
   color_col_levels <- c("ref_ref","L_Paris", "L_wet", "L_dry", "M_wet", "M_dry", "H_wet", "H_dry")
+  
+  color_colx <- "scenario"
+  color_col_levelsx <- c("ref", "L", "M", "H")
+  
+  line_col <- "variant"
+  line_col_levels <- c("observation", "hindcast", "ref", "wet", "dry", "Paris")
   
   group_cols <- c("basin", "scenario", "variant", "horizon", "scen_var", "scen_var_hor", "hydro_model", "run_type")
   linking_cols <- c("basin", "run_type")
@@ -754,12 +776,13 @@ combined_annual_horizon_boxplot <- function(dt, plot_dir, bsn) {
     dt_diff <<- compute_mean_diff_se(dt, value_col, group_cols, linking_cols, comparison_col = color_col, comparison_ref = comparison_ref, statistic = stat)
     
     dt_diff[, (color_col) := factor(get(color_col), levels = color_col_levels)]
+    dt_diff[, (color_colx) := factor(get(color_colx), levels = color_col_levelsx)]
+    dt_diff[, (line_col) := factor(get(line_col), levels = line_col_levels)]
     dt_diff[, horizon := factor(horizon, levels = c("ref", "2033", "2050", "2100", "2150"),
                            labels = c("Ref", "2033", "2050", "2100", "2150"))]
-    dt_diff[, x_facet := match(get(color_col), levels(get(color_col))[levels(get(color_col)) %in% get(color_col)]), by = horizon]
+    dt_diff[, x_facet := match(get(color_colx), levels(get(color_colx))[levels(get(color_colx)) %in% get(color_colx)]), by = horizon]
     
-    
-    pls[[i]] <- plot_annual_horizon_boxplots_combination(dt_diff, plot_dir, bsn, color_col, value_col, stat, y_lim = y_lims[[i]], rel = relative[i], abs = absolute[i], 
+    pls[[i]] <- plot_annual_horizon_mean_diff_combination(dt_diff, plot_dir, bsn, color_col, line_col, value_col, stat, y_lim = y_lims[[i]], rel = relative[i], abs = absolute[i], 
                                                          titles[i], legend = lg[i], y_label = lab[i])
     
   }
@@ -769,9 +792,9 @@ combined_annual_horizon_boxplot <- function(dt, plot_dir, bsn) {
                  axis = "l")
   
   # Save the plot
-  save_dir <- file.path(plot_dir, "annual_horizon_boxplots", "tair_prec")
-  filename <- paste0("annual_horizon_", bsn, "_tair_prec.pdf")
-  save_plot(p, save_dir, filename, width = 12, height = 8)
+  save_dir <- file.path(plot_dir, "annual_horizon_mean_se", "tair_prec")
+  filename <- paste0("annual_horizon_", bsn, "_tair_prec_stack_col.pdf")
+  save_plot(p, save_dir, filename, width = 18, height = 8)
 }
 
 plot_seasonal_boxplots <- function(dt_seasonal, plot_dir, bsn, color_col, color_col_levels, value_col, group_cols, stat, info_text = "", rel = FALSE) {

@@ -1,14 +1,15 @@
 library(ggplot2)
 
 custom_theme <- function() {
-  theme_minimal(base_size = 20) + # every text 20 for presentation slides
+  text_size <- 25  # Set text size for all elements
+  theme_minimal(base_size = text_size) + # every text 20 for presentation slides
     theme(
       text = element_text(color = "black"),
-      axis.text = element_text(size = 20, color = "black"),
-      axis.title = element_text(size = 20, face = "bold", color = "black"),
-      legend.text = element_text(size = 20, color = "black"),
-      legend.title = element_text(size = 20, face = "bold", color = "black"),
-      plot.title = element_text(size = 20, face = "bold", hjust = 0.5, color = "black"),
+      axis.text = element_text(size = text_size, color = "black"),
+      axis.title = element_text(size = text_size, face = "bold", color = "black"),
+      legend.text = element_text(size = text_size, color = "black"),  # + 5 in needed
+      legend.title = element_text(size = text_size, face = "bold", color = "black"),
+      plot.title = element_text(size = text_size, face = "bold", hjust = 0.5, color = "black"),
       
       legend.key = element_rect(colour = NA, fill = NA),
       legend.background = element_rect(fill = "transparent", colour = NA),
@@ -92,6 +93,8 @@ plot_info <- list(
       "wet" = "red"
     ),
     linetypes = c(
+      "observation" = "solid",  # Solid line for observations
+      "hindcast" = "solid",     # Solid line for hindcast
       "ref" = "solid",      # Solid line for observations or baseline
       "dry"  = "dashed",     # Dashed line for dry scenarios (clear but subtle)
       "wet"  = "dotted",     # Dot-dash line for wet scenarios (visibly distinct)
@@ -105,6 +108,8 @@ plot_info <- list(
       "Paris" = 17          # Diamond for Paris Agreement scenario
     ),
     labels = c(
+      "observation" = "Observation",
+      "hindcast" = "Hindcast",
       "ref" = "Reference",
       "dry" = "dry",
       "wet" = "wet",
@@ -130,7 +135,7 @@ plot_info <- list(
     labels = c(
       "observation" = "Observation",
       "hindcast" = "Hindcast",
-      "ref" = "Reference",
+      "ref" = "KNMI'23",
       "2033" = "2033",
       "2050" = "2050",
       "2100" = "2100",
@@ -314,9 +319,9 @@ plot_info <- list(
     colors = c(
       "observation" = "black",
       "hindcast" = "grey40",
-      "future_V1" = "grey60",
+      "future_V1" = "grey70",
       "no_sund_bc" = "red",
-      "sund_bc" = "orange",
+      "sund_bc" = "grey70",
       "with_glac_sdbc" = "darkblue",
       "with_glac_sund" = "lightblue"
     ),
@@ -332,9 +337,9 @@ plot_info <- list(
     labels = c(
       "observation" = "Observation",
       "hindcast" = "Hindcast",
-      "future_V1" = "Future V1",
-      "no_sund_bc" = "without sund BC",
-      "sund_bc" = "with sund BC",
+      "future_V1" = "KNMI'23",
+      "no_sund_bc" = "KNMI'23 no BC",
+      "sund_bc" = "KNMI'23",
       "with_glac_sdbc" = "with CH2018 glacier",# "with CH2018 glacier, with sund BC",
       "with_glac_sund" = "with CH2018 glacier, no sund BC"
     )

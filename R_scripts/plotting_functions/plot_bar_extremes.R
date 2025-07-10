@@ -123,7 +123,7 @@ plot_seasonal_bars_with_error <- function(dt_seasonal, plot_dir, bsn, color_col,
   save_plot(p, save_dir, filename, width = 10, height = 6)
 }
 
-barplot_season <- function(dt, color_col, title, legend = T, y_label = T) {
+barplot_season <- function(dt, color_col, title, legend = T, y_label = T, y_limits = NULL) {
   
   if(y_label == T){
     ylab <- "days per year"
@@ -155,7 +155,7 @@ barplot_season <- function(dt, color_col, title, legend = T, y_label = T) {
   # Legend logic
   legend_theme <- if (legend) {
     theme(
-      legend.position = c(1, 1.03),
+      legend.position = c(1.05, 1.11),
       legend.justification = "right"
     )
   } else {
@@ -171,6 +171,7 @@ barplot_season <- function(dt, color_col, title, legend = T, y_label = T) {
       values = plot_info[[color_col]]$colors,
       labels = plot_info[[color_col]]$labels
     ) +
+    (if (!is.null(y_limits)) coord_cartesian(ylim = y_limits) else NULL) +
     facet_grid(facet_horizon ~ ., labeller = labeller(facet_horizon = hor.labs)) +
     labs(title = title, x = "", y = ylab) +
     theme(
@@ -183,9 +184,9 @@ barplot_season <- function(dt, color_col, title, legend = T, y_label = T) {
     theme(
           #legend.position = leg,
           #legend.justification = "right", 
-          legend.key = element_rect(colour = NA, fill = NA), strip.text.y = element_text(size = 8), axis.text.y = element_text(size = 8),
-          legend.background = element_rect(fill = "transparent"), legend.text = element_text(size = 8), legend.key.size = unit(0.2, 'cm'), axis.text.x = element_text(size = 8),
-          plot.margin = unit(c(15, 5.5, 5.5, 5.5), "pt"), plot.title = element_text(size = 10, vjust = 2), axis.title = element_text(size = 8))
+          legend.key = element_rect(colour = NA, fill = NA), strip.text.y = element_text(size = 10), axis.text.y = element_text(size = 10),
+          legend.background = element_rect(fill = "transparent"), legend.text = element_text(size = 10), legend.key.size = unit(0.2, 'cm'), axis.text.x = element_text(size = 10),
+          plot.margin = unit(c(15, 5.5, 5.5, 5.5), "pt"), plot.title = element_text(size = 10, vjust = 2), axis.title = element_text(size = 10))
   
   # change facet colors
   g <- ggplot_gtable(ggplot_build(pl))
@@ -225,6 +226,20 @@ combined_bar_plot_season <- function(dt, plot_dir, bsn, q_bot, q_top, time_perio
     color_col <- "horizon"
     color_col_levels <- c("observation", "hindcast", "ref", "2050", "2100", "2150")
     
+    lg <- c(F, T) # legend list
+    lab <- c(T, F) # y-label list
+    
+    q90_vals <- sapply(days_col, function(col) {
+      quantile(dt[[col]], 0.9, na.rm = TRUE)
+    })
+    
+    # Set y-axis limits from 0 to the maximum q90 value
+    y_limits <- c(0, max(q90_vals, na.rm = TRUE))
+    
+    plot_width <- 8.27
+    plot_height <- 2.5
+    plot_cols <- 2
+    
   } else if (time_period == "future") {
     # Remove "observation" entirely
     dt_facet <- dt[!horizon %in% c("observation", "hindcast", "2033")]
@@ -247,6 +262,15 @@ combined_bar_plot_season <- function(dt, plot_dir, bsn, q_bot, q_top, time_perio
     
     color_col <- "scen_var"
     color_col_levels <- c("ref_ref","L_Paris", "L_wet", "L_dry", "M_wet", "M_dry", "H_wet", "H_dry")
+    
+    lg <- c(T, F) # legend list
+    lab <- c(T, T) # y-label list
+    
+    y_limits <- NULL
+    
+    plot_width <- 6
+    plot_height <- 7
+    plot_cols <- 1
   }
   
   # create all plots
@@ -263,16 +287,16 @@ combined_bar_plot_season <- function(dt, plot_dir, bsn, q_bot, q_top, time_perio
     dt_summary[, (color_col) := factor(get(color_col), levels = color_col_levels)]
     dt_summary[, season := factor(season, levels = c("DJF", "MAM", "JJA", "SON", "Year"))]
     
-    pls[[i]] <- barplot_season(dt_summary, color_col, titles[i], legend = lg[i], y_label = lab[i])
+    pls[[i]] <- barplot_season(dt_summary, color_col, titles[i], legend = lg[i], y_label = lab[i], y_limits)
   }
   
-  p <- plot_grid(pls[[1]], pls[[2]], ncol = 1)
+  p <- plot_grid(pls[[1]], pls[[2]], ncol = plot_cols)
   
   # Save the plot
   save_dir <- file.path(plot_dir, "seasonal_barplots", value_col)
   filename <- paste0("seasonal_bar_combined_", bsn, paste0("_Q", q_bot*100, "_Q", q_top*100), "_", time_period, ".pdf")
   
-  save_plot(p, save_dir, filename, width = 6, height = 7)  # 8.27, 3
+  save_plot(p, save_dir, filename, width = plot_width, height = plot_height)  # 8.27, 3
 
   # for(i in 1:length(data)){
   #   if(grepl("Drought", names(data)[i]) == T){

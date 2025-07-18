@@ -155,7 +155,7 @@ barplot_season <- function(dt, color_col, title, legend = T, y_label = T, y_limi
   # Legend logic
   legend_theme <- if (legend) {
     theme(
-      legend.position = c(1.05, 1.11),
+      legend.position = c(1.10, 1.11),
       legend.justification = "right"
     )
   } else {
@@ -278,7 +278,7 @@ combined_bar_plot_season <- function(dt, plot_dir, bsn, q_bot, q_top, time_perio
   for (i in seq_along(days_col)) {
     col <- days_col[i]
     
-    dt_summary <- dt_final[, .(
+    dt_summary <<- dt_final[, .(
       mean = mean(get(col), na.rm = TRUE),
       q10 = quantile(get(col), 0.1, na.rm = TRUE),
       q90 = quantile(get(col), 0.9, na.rm = TRUE)

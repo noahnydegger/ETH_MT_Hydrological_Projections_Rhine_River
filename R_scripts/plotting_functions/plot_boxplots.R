@@ -84,7 +84,7 @@ compute_mean_diff_se <- function(
     statistic = "mean", seasonal = FALSE, monthly = FALSE, half_year = FALSE
 ) {
   
-  stat_col <- value_col # paste0(value_col, "_", statistic) #value_col # 
+  stat_col <<- value_col # paste0(value_col, "_", statistic) #value_col # 
   
   dt[, YYYY := year(date)]
   dt[, MM := month(date)]
@@ -630,7 +630,7 @@ plot_annual_horizon_mean_diff_combination <- function(dt, plot_dir, bsn, color_c
   # Legend logic
   legend_theme <- if (legend) {
     theme(
-      legend.position = c(1, 1.18),
+      legend.position = c(1, 1.185),
       legend.justification = "right"
     )
   } else {
@@ -641,7 +641,7 @@ plot_annual_horizon_mean_diff_combination <- function(dt, plot_dir, bsn, color_c
   line_width <- 0.6
   
   # Plot annual boxplots
-  p <- ggplot(dt, aes(x = x_facet, y = .data[[mean_col]], fill = .data[[color_col]])) # , linetype = .data[[line_col]]
+  p <- ggplot(dt, aes(x = x_facet, y = .data[[mean_col]], fill = .data[[color_col]], linetype = .data[[line_col]])) # , linetype = .data[[line_col]]
   
   if (rel) {
     p <- p + geom_hline(yintercept = 0, linewidth = 0.3, color = "grey50")
@@ -650,23 +650,23 @@ plot_annual_horizon_mean_diff_combination <- function(dt, plot_dir, bsn, color_c
   p <- p + 
     #geom_boxplot(width = 0.6, outlier.size = 0.5) +
     
-    geom_rect(
-      aes(xmin = x_facet - box_width / 2,
-          xmax = x_facet + box_width / 2,
-          ymin = min_val,
-          ymax = max_val,
-          fill = .data[[color_col]]),
-      alpha = 0.4,
-      color = NA  # no border
-    ) +
+    # geom_rect(
+    #   aes(xmin = x_facet - box_width / 2,
+    #       xmax = x_facet + box_width / 2,
+    #       ymin = min_val,
+    #       ymax = max_val,
+    #       fill = .data[[color_col]]),
+    #   alpha = 0.4,
+    #   color = NA  # no border
+    # ) +
     
     geom_segment(
       aes(x = x_facet - line_width / 2,
           xend = x_facet + line_width / 2,
           y = .data[[mean_col]],
           yend = .data[[mean_col]],
-          color = .data[[color_col]]
-          #linetype = .data[[line_col]]
+          color = .data[[color_col]],
+          linetype = .data[[line_col]]
           ),
       linewidth = 1.5
     ) +
@@ -677,8 +677,8 @@ plot_annual_horizon_mean_diff_combination <- function(dt, plot_dir, bsn, color_c
       x = NULL,
       y = ylab,
       fill = NULL,
-      color = NULL #"Scenario"
-      #linetype = "Variant"
+      color = "Scenario",
+      linetype = "Variant"
     ) +
     custom_theme() +
     legend_theme +
@@ -711,7 +711,7 @@ plot_annual_horizon_mean_diff_combination <- function(dt, plot_dir, bsn, color_c
     guides(
       fill = "none",
       color = guide_legend(title.position = "left", nrow = 1, order = 1),
-      linetype = "none" #guide_legend(title.position = "left", nrow = 1, order = 2)
+      linetype = guide_legend(title.position = "left", nrow = 1, order = 2)
     ) +
     scale_fill_manual(
       values = plot_info[[color_col]]$colors,
@@ -719,7 +719,7 @@ plot_annual_horizon_mean_diff_combination <- function(dt, plot_dir, bsn, color_c
     ) +
     scale_color_manual(
       values = plot_info[[color_col]]$colors,
-      labels = c("ref_ref" = "ref","L_Paris" = "L 1.5°C", "L_wet" = "L wet", "L_dry" = "L dry", "M_wet" = "M wet", "M_dry" = "M dry", "H_wet" = "H wet", "H_dry" = "H dry")
+      labels = plot_info[[color_col]]$labels # c("ref_ref" = "ref","L_Paris" = "L 1.5°C", "L_wet" = "L wet", "L_dry" = "L dry", "M_wet" = "M wet", "M_dry" = "M dry", "H_wet" = "H wet", "H_dry" = "H dry")
     ) +
     scale_linetype_manual(
       values = plot_info[[line_col]]$linetypes,
@@ -745,7 +745,7 @@ combined_annual_horizon_mean_diff <- function(dt, plot_dir, bsn) {
   relative <- c(F, T) # relative change
   absolute <- c(T, F) # absolute change
   
-  value_cols <- c("tair_avg", "prec_avg")
+  value_cols <- c("tair_avg", "prec_avg") # tair_avg
   y_lims <- list(c(0, 8), c(-5, 12))
   
   color_col <- "scen_var"
@@ -754,13 +754,16 @@ combined_annual_horizon_mean_diff <- function(dt, plot_dir, bsn) {
   color_colx <- "scenario"
   color_col_levelsx <- c("ref", "L", "M", "H")
   
+  color_col <- "scenario"
+  color_col_levels <- c("ref", "L", "M", "H")
+  
   line_col <- "variant"
   line_col_levels <- c("observation", "hindcast", "ref", "wet", "dry", "Paris")
   
   group_cols <- c("basin", "scenario", "variant", "horizon", "scen_var", "scen_var_hor", "hydro_model", "run_type")
   linking_cols <- c("basin", "run_type")
   
-  comparison_ref = "ref_ref"
+  comparison_ref = "ref"
   
   stat = "mean"
 
@@ -793,7 +796,7 @@ combined_annual_horizon_mean_diff <- function(dt, plot_dir, bsn) {
   
   # Save the plot
   save_dir <- file.path(plot_dir, "annual_horizon_mean_se", "tair_prec")
-  filename <- paste0("annual_horizon_", bsn, "_tair_prec_stack_col.pdf")
+  filename <- paste0("annual_horizon_", bsn, "_tair_prec_stack_temp.pdf")
   save_plot(p, save_dir, filename, width = 18, height = 8)
 }
 
@@ -966,6 +969,218 @@ plot_seasonal_mean_diff <- function(dt, plot_dir, bsn, color_col, color_col_leve
   save_plot(p, save_dir, filename, width = 10, height = 6)
 }
 
+plot_seasonal_mean_diff_combination <- function(dt, color_col, line_col, value_col, stat, 
+                                                title, legend, y_label, 
+                                                y_limits, rel = FALSE) {
+  
+  value_name <- plot_info$column_info$names[[value_col]]
+  value_unit <- plot_info$column_info$units[[value_col]]
+  
+  if (rel) {
+    info_text <- paste0(info_text, "_rel")
+    value_unit <- "[%]"
+    y_text <- paste("change in", value_name, "[%]")
+    
+    mean_col <- "mean_diff_rel"
+    se_col <- "se_diff_rel"
+  } else {
+    info_text <- paste0(info_text, "_abs")
+    y_text <- paste("change in", value_name, value_unit)
+    mean_col <- "mean_diff_abs"
+    se_col <- "se_diff_abs"
+  }
+  
+  dt[, `:=`(
+    min_val = get(mean_col) - get(se_col),
+    max_val = get(mean_col) + get(se_col)
+  )]
+  
+  # legend logic
+  if (legend == "none") {
+    legend_theme <- theme(legend.position = "none")
+    guide_layers <- guides()
+    
+  } else if (legend == "colour") {
+    legend_theme <- theme(
+      legend.position = c(1.0, 1.145),
+      legend.justification = "right",
+      legend.key.width = unit(2.0, "cm")  # Only for line legend
+    )
+    
+    guide_layers <- guides(
+      color = guide_legend(title.position = "left", nrow = 1),
+      linetype = "none"
+    )
+    
+  } else if (legend == "line") {
+    legend_theme <- theme(
+      legend.position = c(1, 1.145),
+      legend.justification = "right",
+      legend.key.width = unit(2.0, "cm")  # Only for line legend
+    )
+    
+    guide_layers <- guides(
+      linetype = guide_legend(title.position = "left", nrow = 1),
+      color = "none"
+    )
+    
+  } else {
+    # Default: show both
+    legend_theme <- theme(
+      legend.position = c(1, 1.03),
+      legend.justification = "right"
+    )
+    
+    guide_layers <- guides(
+      color = guide_legend(title.position = "top", nrow = 1),
+      linetype = guide_legend(title.position = "top", nrow = 1)
+    )
+  }
+  
+  # y-label
+  ylab <- if (y_label) y_text else ""
+  
+  #dt[, (color_col) := factor(get(color_col), levels = color_col_levels)]
+  
+  # Define season as factor with desired order
+  dt[, season := factor(season, levels = c("DJF", "MAM", "JJA", "SON"))]
+  
+  box_width <- 0.6
+  line_width <- 0.6
+  
+  # Plot seasonal mean differences
+  p <- ggplot(dt, aes(x = season, y = .data[[mean_col]], linetype = .data[[line_col]]))
+  
+  if (rel) {
+    p <- p + geom_hline(yintercept = 0, linewidth = 0.3, color = "grey30")
+  }
+  
+  p <- p + 
+    
+    # geom_rect(
+    #   aes(xmin = as.numeric(season) - box_width / 2,
+    #       xmax = as.numeric(season) + box_width / 2,
+    #       ymin = min_val,
+    #       ymax = max_val,
+    #       fill = .data[[color_col]]),
+    #   alpha = 0.4,
+    #   color = NA  # no border
+    # ) +
+    
+    geom_segment(
+      aes(x = as.numeric(season) - line_width / 2,
+          xend = as.numeric(season) + line_width / 2,
+          y = .data[[mean_col]],
+          yend = .data[[mean_col]],
+          color = .data[[color_col]],
+          linetype = .data[[line_col]]
+      ),
+      linewidth = 1.5
+    ) +
+    
+    labs(
+      title = title, #paste("Seasonal", stat, value_name, bsn, info_text),
+      x = NULL, #"Season",
+      y = ylab,
+      color = NULL,
+      linetype = NULL
+    ) +
+    custom_theme() +
+    legend_theme +
+    theme(
+      legend.key = element_rect(colour = NA, fill = NA),
+      legend.background = element_rect(fill = "transparent", colour = NA),
+      #axis.text.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      panel.grid.major.y = element_line(size = 0.3, linetype = 'dotted', colour = "grey80"),
+      panel.grid.minor.y = element_blank(),
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor.x = element_blank(),
+      legend.direction = "horizontal",
+      legend.box = "horizontal",
+      plot.title = element_text(vjust = 2, hjust = 0)
+    ) +
+    guide_layers +
+    (if (!is.null(y_limits)) 
+      ylim(y_limits) else NULL) +
+    scale_color_manual(
+      values = plot_info[[color_col]]$colors,
+      labels = plot_info[[color_col]]$labels
+    ) +
+    scale_linetype_manual(
+      values = plot_info[[line_col]]$linetypes,
+      labels = plot_info[[line_col]]$labels
+    ) +
+    scale_x_continuous(
+      breaks = 1:4,
+      labels = levels(dt$season)
+    )
+  
+  return(p)
+}
+
+combined_seasonal_horizon_mean_diff_plot <- function(dt, plot_dir, bsn, value_col, stat, info_text) {
+  
+  titles <- c(
+    paste0("(c) 2033"),
+    paste0("(d) 2150"),
+    paste0("(a) 2050"),
+    paste0("(b) 2100")
+  )
+  lg <- c("line", "none", "line", "colour") # legend list
+  lab <- c(T, F, T, F) # y-label list
+  
+  horizons <- c("2033", "2150", "2050", "2100")
+  
+  color_col <- "scenario"
+  color_col_levels <- c("observation", "hindcast", "ref", "L", "M", "H")
+  
+  line_col <- "variant"
+  line_col_levels <- c("observation", "hindcast", "ref", "wet", "dry", "Paris")
+  
+  group_cols <- c("basin", "scenario", "variant", "horizon", "scen_var", "scen_hor", "scen_var_hor", "hydro_model", "run_type")
+  linking_cols <- c("basin", "run_type")
+  
+  stat <- "mean"
+  
+  comparison_col <- "scen_var_hor"
+  comparison_ref <- "ref_ref_ref"
+  
+  dt_diff <<- compute_mean_diff_se(dt, value_col, group_cols, linking_cols, comparison_col, comparison_ref, stat, seasonal = TRUE)
+  
+  dt_diff[, (color_col) := factor(get(color_col), levels = color_col_levels)]
+  dt_diff[, (line_col) := factor(get(line_col), levels = line_col_levels)]
+  
+  stat_col <- "mean_diff_rel" # paste0(stat, "_", value_col)
+  y_min <- min(dt_diff[[stat_col]], na.rm = TRUE)
+  y_max <- max(dt_diff[[stat_col]], na.rm = TRUE)
+  y_limits <- c(y_min, y_max)
+  
+  # create all plots
+  pls <- list() # empty list
+  for (i in seq_along(horizons)) {
+    
+    dt_h <- dt_diff[horizon %in% c(horizons[i])]
+    
+    pls[[i]] <- plot_seasonal_mean_diff_combination(dt_h, color_col, line_col, value_col, stat, 
+                                                titles[i], legend = lg[i], y_label = lab[i], y_limits = y_limits, rel = TRUE)
+  }
+  
+  p <- plot_grid(pls[[3]], pls[[4]], pls[[1]], pls[[2]], ncol = 2)
+  
+  # Dynamic height
+  n_horizons <- length(pls)
+  base_height <- 2.2
+  total_height <- n_horizons * base_height
+  
+  # Save
+  save_dir <- file.path(plot_dir, "seasonal_mean_diff_horizon", value_col)
+  filename <- paste0("seasonal_mean_diff_horizon_", bsn, "_", stat, "_", value_col, info_text, "report", ".pdf")
+  
+  save_plot(p, save_dir, filename, width = 19, height = total_height)
+  
+}
+
 # Function to plot monthly and yearly boxplots from daily data.table
 plot_month_year_boxplots <- function(dt_month, dt_year, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text = "", rel = FALSE) {
   
@@ -1104,6 +1319,134 @@ plot_variables_change_boxplot <- function(dt, color_col, title, legend = T, y_la
   
 }
 
+plot_variables_change_mean_diff <- function(dt, color_col, line_col, title, lg, y_label = T, y_limits = NULL){
+
+  if(y_label == T){
+    ylab <- "change [mm]"
+  } else if(y_label == F){
+    ylab <- ""
+  }
+  # facet labels
+  hor.labs <- c("observation" = "Observation", "hindcast" = "hindcast", "ref" = "Reference", "2150" = "2150", "2100" = "2100", "2050" = "2050")
+  
+  # Get relevant horizon levels from the data
+  horizons_in_data <- intersect(names(hor.labs), unique(dt$horizon))
+  horizons_in_data <- names(hor.labs)[names(hor.labs) %in% horizons_in_data]
+  
+  # Legend logic
+  if (lg == "color") {
+    legend_theme <- theme(
+      legend.position = c(1.07, 1.04),
+      legend.justification = "right"
+    )
+    
+    guide_layers <- guides(
+      color = guide_legend(title.position = "left", nrow = 1),
+      linetype = "none"
+    )
+    
+  } else if (lg == "line") {
+    legend_theme <- theme(
+      legend.position = c(1, 1.04),
+      legend.justification = "right",
+      legend.key.width = unit(1.0, "cm")  # Only for line legend
+    )
+    
+    guide_layers <- guides(
+      linetype = guide_legend(title.position = "left", nrow = 1),
+      color = "none"
+    )
+    
+  }
+  
+  box_width <- 0.6
+  line_width <- 0.6
+  text_size <- 12
+  
+  dt[, variable := factor(variable)]
+  dt[, variable_num := as.numeric(variable)]
+  
+  # Create x-axis label positions and labels from actual data
+  x_breaks <- unique(dt$variable_num)
+  x_labels <- levels(dt$variable)[x_breaks]
+  
+  # plot
+  p <- ggplot(dt, aes(x = variable_num, y = mean_diff_abs, linetype = .data[[line_col]])) +
+    
+    geom_segment(
+      aes(x = variable_num - line_width / 2,
+          xend = variable_num + line_width / 2,
+          y = mean_diff_abs,
+          yend = mean_diff_abs,
+          color = .data[[color_col]],
+          linetype = .data[[line_col]]
+      ),
+      linewidth = 0.7
+    ) +
+    
+    scale_x_continuous(
+      breaks = x_breaks,
+      labels = x_labels
+    ) +
+    
+    scale_color_manual(
+      values = plot_info[[color_col]]$colors,
+      labels = plot_info[[color_col]]$labels
+    ) +
+    scale_linetype_manual(
+      values = plot_info[[line_col]]$linetypes,
+      labels = plot_info[[line_col]]$labels
+    ) +
+    
+    labs(title = title, 
+         x = "", 
+         y = ylab,
+         color = NULL,
+         linetype = NULL
+         ) +
+    geom_hline(yintercept = 0, lwd = 0.3, col = "grey50") + # add horizontal line to empty ggplot
+    guide_layers +
+    #custom_theme() +
+    legend_theme +
+    #theme_minimal(base_size = text_size) +
+    theme(
+      panel.background = element_rect(fill = "white", colour = "grey96"),
+      panel.grid.major = element_line(size = 0.2, linetype = 'dotted', colour = "grey80"), 
+      panel.grid.minor = element_line(size = 0.2, linetype = 'dotted',colour = "grey80"),
+      axis.line.x = element_line(colour = "black", size = 0.3),
+      axis.line.y = element_line(colour = "black", size = 0.3),
+      legend.key = element_rect(colour = NA, fill = NA), 
+      legend.background = element_rect(fill = "transparent"),
+      plot.title = element_text(vjust = 2, hjust = 0, size = text_size, face = "bold", color = "black"),
+      plot.margin = unit(c(15, 5.5, 5.5, 5.5), "pt"),
+      
+      #legend.position = leg, legend.justification = "right"
+      text = element_text(color = "black"),
+      legend.text = element_text(size = text_size),
+      axis.title = element_text(size = text_size, face = "bold", color = "black"),
+      axis.text = element_text(size = text_size, color = "black"),
+      strip.text = element_text(size = text_size, color = "black")
+      ) +
+    (if (!is.null(y_limits)) coord_cartesian(ylim = y_limits) else NULL) +
+    
+    facet_grid(horizon ~ ., labeller = labeller(horizon = hor.labs))
+  
+  # change facet colors
+  g <- ggplot_gtable(ggplot_build(p))
+  strip_right <- which(grepl('strip-r', g$layout$name))
+  fills <- c("#fecd07ff", "#6fb8c2ff", "#934c94ff")
+  fills <- rev(unname(plot_info[["horizon"]]$colors[horizons_in_data]))
+  k <- 1
+  for (i in strip_right) {
+    j <- which(grepl('rect', g$grobs[[i]]$grobs[[1]]$childrenOrder))
+    g$grobs[[i]]$grobs[[1]]$children[[j]]$gp$fill <- fills[k]
+    k <- k + 1
+  }
+  # output plot
+  return(as.ggplot(g))
+  
+}
+
 get_combined_long_diff_dt <- function(dt, value_cols, group_cols, linking_cols,
                                       color_col, comparison_ref, stat, seasonal = FALSE, half_year = FALSE) {
   # Short variable labels (customize order)
@@ -1116,7 +1459,19 @@ get_combined_long_diff_dt <- function(dt, value_cols, group_cols, linking_cols,
     if (all(is.na(dt[[value_col]]))) next
     
     # Compute differences
-    dt_diff <- compute_member_differences(
+    # dt_diff <- compute_member_differences(
+    #   dt,
+    #   value_col = value_col,
+    #   group_cols = group_cols,
+    #   linking_cols = linking_cols,
+    #   comparison_col = color_col,
+    #   comparison_ref = comparison_ref,
+    #   statistic = stat,
+    #   seasonal = seasonal,
+    #   half_year = half_year
+    # )
+    
+    dt_diff <- compute_mean_diff_se(
       dt,
       value_col = value_col,
       group_cols = group_cols,
@@ -1142,8 +1497,8 @@ get_combined_long_diff_dt <- function(dt, value_cols, group_cols, linking_cols,
     dt_sub <- dt_diff[, ..cols_keep]
     
     # Add computed values
-    dt_sub[, abs_diff := dt_diff[[abs_col]]]
-    dt_sub[, rel_diff := dt_diff[[rel_col]]]
+    dt_sub[, mean_diff_abs := dt_diff[["mean_diff_abs"]]]
+    dt_sub[, mean_diff_rel := dt_diff[["mean_diff_rel"]]]
     dt_sub[, variable := vars_map[[value_col]]]
     
     dt_list[[value_col]] <- dt_sub
@@ -1206,7 +1561,7 @@ combined_variables_change_boxplot_half_year <- function(dt, plot_dir, bsn, time_
     paste0("(a) summer"),
     paste0("(b) winter")
   )
-  lg <- c(F, T) # legend list
+  lg <- c("line", "color") # legend list
   lab <- c(T, F) # y-label list
   
   seasons <- c("summer", "winter")
@@ -1223,14 +1578,21 @@ combined_variables_change_boxplot_half_year <- function(dt, plot_dir, bsn, time_
     dt_final <- dt[!horizon %in% c("observation", "hindcast", "ref", "2033")]
     
     color_col <- "scen_var"
-    color_col_levels <- c("none_none","L_none", "L_wet", "L_dry", "M_wet", "M_dry", "H_wet", "H_dry")
+    color_col_levels <- c("ref_ref","L_Paris", "L_wet", "L_dry", "M_wet", "M_dry", "H_wet", "H_dry")
+    
+    color_col <- "scenario"
+    color_col_levels <- c("observation", "hindcast", "ref", "L", "M", "H")
   }
   
-  dt_final[, (color_col) := factor(get(color_col), levels = color_col_levels)]
-  dt_final[, abs_diff := abs_diff * 183]
+  line_col <- "variant"
+  line_col_levels <- c("observation", "hindcast", "ref", "wet", "dry", "Paris")
   
-  y_min <- min(dt_final$abs_diff, na.rm = TRUE)
-  y_max <- max(dt_final$abs_diff, na.rm = TRUE)
+  dt_final[, (color_col) := factor(get(color_col), levels = color_col_levels)]
+  dt_final[, (line_col) := factor(get(line_col), levels = line_col_levels)]
+  dt_final[, mean_diff_abs := mean_diff_abs * 183]
+  
+  y_min <- min(dt_final$mean_diff_abs, na.rm = TRUE)
+  y_max <- max(dt_final$mean_diff_abs, na.rm = TRUE)
   y_limits <- c(y_min, y_max)
   
   # create all plots
@@ -1239,14 +1601,15 @@ combined_variables_change_boxplot_half_year <- function(dt, plot_dir, bsn, time_
     
     dt_season <- dt_final[season == seasons[i]]
     
-    pls[[i]] <- plot_variables_change_boxplot(dt_season, color_col, titles[i], legend = lg[i], y_label = lab[i], y_limits = y_limits)
+    #pls[[i]] <- plot_variables_change_boxplot(dt_season, color_col, titles[i], legend = lg[i], y_label = lab[i], y_limits = y_limits)
+    pls[[i]] <- plot_variables_change_mean_diff(dt_season, color_col, line_col, titles[i], lg = lg[i], y_label = lab[i], y_limits = y_limits)
   }
   
   p <- plot_grid(pls[[1]], pls[[2]], ncol = 2)
   
   # Save the plot
   save_dir <- file.path(plot_dir, "variables_change")
-  filename <- paste0("vars_change_half_year", bsn, "_", time_period, ".pdf")
+  filename <- paste0("vars_change_half_year", bsn, "_", time_period, "_line.pdf")
   
   save_plot(p, save_dir, filename, width = 8.27, height = 6)
   

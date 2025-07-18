@@ -27,33 +27,8 @@ output_file_name <- "knmi_discharge_data"
 # Function to add 'scenario_variant' and 'scenario_variant_horizon' columns with custom ordering
 add_scenario_horizon_grouping_columns <- function(dt) {
   dt[, scen_var := paste(scenario, variant, sep = "_")]
+  dt[, scen_hor := paste(scenario, horizon, sep = "_")]
   dt[, scen_var_hor := paste(scen_var, horizon, sep = "_")]
-  
-  # Define custom order for scenario
-  scenario_order <- c("H", "M", "L", "none")
-  
-  # Define custom order for scen_var (including the variants: dry, wet, none)
-  scen_var_order <- c(
-    "H_dry", "H_wet", "M_dry", "M_wet", "L_dry", "L_wet",
-    "L_none", "none_none"
-  )
-  
-  # Define custom order for scen_var_hor (with horizon)
-  scen_var_hor_order <- c(
-    "H_dry_2150", "H_dry_2100", "H_dry_2050", 
-    "H_wet_2150", "H_wet_2100", "H_wet_2050", 
-    "M_dry_2150", "M_dry_2100", "M_dry_2050", 
-    "M_wet_2150", "M_wet_2100", "M_wet_2050", 
-    "L_dry_2100",
-    "L_wet_2100",
-    "L_none_2033",
-    "none_none_ref", "none_none_hindcast", "none_none_observation"
-  )
-  
-  # Convert scen_var and scen_var_hor to factors with defined levels
-  dt[, scenario := factor(scenario, levels = scenario_order)]
-  dt[, scen_var := factor(scen_var, levels = scen_var_order)]
-  dt[, scen_var_hor := factor(scen_var_hor, levels = scen_var_hor_order)]
   
   return(dt)
 }
@@ -76,6 +51,16 @@ add_time_period_column <- function(dt, date_col = "date", horizon_col = "horizon
   # Optional cleanup
   dt[, c("year", "horizon_num") := NULL]
   
+  return(dt)
+}
+
+add_run_type_column <- function(dt) {
+  dt[, run_type := fifelse(
+    hydro_model == "PREVAH", "future_V1",
+    fifelse(hydro_model == "larsim", "larsim",
+            fifelse(hydro_model == "wflow_sbm", "wflow_sbm",
+                    fifelse(hydro_model == "observation", "observation", NA_character_)))
+  )]
   return(dt)
 }
 
@@ -131,8 +116,25 @@ knmi_discharge_dt_all[scenario == "Mn", scenario := "M"]
 knmi_discharge_dt_all[scenario == "Ld", scenario := "L"]
 knmi_discharge_dt_all[scenario == "Ln", scenario := "L"]
 
+
+# change scenario and variant to "ref" for horizon == "ref"
+knmi_discharge_dt_all[horizon == "ref", scenario := "ref"]
+knmi_discharge_dt_all[horizon == "ref", variant := "ref"]
+
+# change scenario and variant to "hindcast" for horizon == "hindcast"
+knmi_discharge_dt_all[horizon == "hindcast", scenario := "hindcast"]
+knmi_discharge_dt_all[horizon == "hindcast", variant := "hindcast"]
+
+# change scenario and variant to "observation" for horizon == "observation"
+knmi_discharge_dt_all[horizon == "observation", scenario := "observation"]
+knmi_discharge_dt_all[horizon == "observation", variant := "observation"]
+
+# change variant to "Paris" for horizon == "2033"
+knmi_discharge_dt_all[horizon == "2033", variant := "Paris"]
+
 knmi_discharge_dt_all <- add_scenario_horizon_grouping_columns(knmi_discharge_dt_all)
 knmi_discharge_dt_all <- add_time_period_column(knmi_discharge_dt_all)
+knmi_discharge_dt_all <- add_run_type_column(knmi_discharge_dt_all)
 
 # export processed data --------------------------------------------------
 cat("Exporting combined data to RDS and CSV...\n")

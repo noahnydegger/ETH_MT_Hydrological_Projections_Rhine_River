@@ -7,22 +7,23 @@ plot_dir <- file.path(home_dir, "Plots", "Reference_Period_Analysis", "glacier_s
 plot_dir <- file.path(home_dir, "Plots", "Reference_Period_Analysis", "2inter_meeting", "H_wet")
 plot_dir <- file.path(home_dir, "Plots", "future_V1", "all_data")
 
-info_text = ""
+info_text = "_"
 #info_text = "sund_bc"
   
-# select the dataset to plot: mit_output, meteo_stat, discharge, lakelevel, meteo_input, meteo_sund
-dataset <- "meteo_input"
+# select the dataset to plot: mit_output, meteo_stat, discharge, discharge_rblick, lakelevel, meteo_input, meteo_sund
+dataset <- "meteo_sund"
 
 plot_selection <- c(
-  "seasonality" = FALSE,
+  "seasonality" = TRUE,
   "seasonality_horizon" = FALSE,
   "annual_horizon_mean_diff" = FALSE,
-  "annual_horizon_mean_diff_combination" = TRUE,
+  "annual_horizon_mean_diff_combination" = FALSE,
   "CH2018_annual_comparison" = FALSE,
   "annual_boxplot" = FALSE,
   "annual_horizon_boxplot" = FALSE,
   "seasonal_boxplot" = FALSE,
   "seasonal_mean_diff" = FALSE,
+  "seasonal_horizon_mean_diff" = FALSE,
   "monthly_boxplot" = FALSE,
   "annual_vars_change_boxplot" = FALSE,
   "half_year_vars_change_boxplot" = FALSE,
@@ -42,7 +43,7 @@ plot_dataset <- c(
 period_sel <- c("simulation") # or warmup
 
 # if empty c() plot all basins
-basin_sel <- c("RhB200", "ThS200", "Thu200")#, "RhD200", "RhN200", "RhR200", "AaU200", "ThS200", "Thu200", "TGl200", "HiR200", "VoR200", "Bod400")
+basin_sel <- c("RhB200")#, "ThS200", "Thu200")#, "RhD200", "RhN200", "RhR200", "AaU200", "ThS200", "Thu200", "TGl200", "HiR200", "VoR200", "Bod400")
 
 scen_var_hor_sel <- c("observation_observation_observation", "hindcast_hindcast_hindcast", "ref_ref_ref",
                       "L_Paris_2033",
@@ -63,10 +64,13 @@ scen_var_hor_sel <- c("observation_observation_observation", "hindcast_hindcast_
 
 horizon_sel <- c("observation", "hindcast", "ref", "2033", "2050", "2100", "2150")
 #horizon_sel <- c("ref", "2100")#, "2050", "2100", "2150")
+horizon_sel <- c("observation", "ref",  "hindcast")
 
 run_type_sel <- c("future_V1", "hindcast", "observation", "no_sund_bc", "sund_bc")
+#run_type_sel <- c("observation", "future_V1", "larsim", "wflow_sbm") #, "sund_bc", "no_sund_bc")
 
 hydro_model_sel <- c("none","observation" ,"PREVAH") #, "wflow_sbm", "larsim", "PREVAH")
+#hydro_model_sel <- c("observation", "PREVAH", "larsim", "wflow_sbm") #, "sund_bc", "no_sund_bc")
 
 color_col <- "scen_var"
 color_col_levels <- c("ref_ref","L_Paris", "L_wet", "L_dry", "M_wet", "M_dry", "H_wet", "H_dry")
@@ -87,6 +91,9 @@ color_col_levels <- c("observation", "hindcast", "future_V1", "sund_bc", "no_sun
 #color_col <- "horizon"
 #color_col_levels <- c("observation", "hindcast", "ref", "2033", "2050", "2100", "2150")
 
+#color_col <- "hydro_model"
+#color_col_levels <- c("observation", "PREVAH", "larsim", "wflow_sbm")
+
 comparison_ref = "ref"
 
 line_col <- "variant"
@@ -102,9 +109,16 @@ if (dataset == "mit_output") {
   
 } else if (dataset == "discharge") {
   basin_sel <- unique(knmi_discharge_dt$station)
-  basin_sel <- c("Basel Rheinhalle", "Andelfingen", "Rhine_Neuhausen", "Diepoldsau", "Aare_Untersiggenthal", "Aare_Thun")#, "Rekingen", "Aare_Thun", "Limmatt_Baden", "Mellingen")#, "Limmatt_Baden", "Reuss_Luzern", "Bruegg-Aegerten", "Aare_Untersiggenthal")
+  basin_sel <- c("Basel Rheinhalle")#, "Andelfingen", "Rhine_Neuhausen", "Diepoldsau", "Aare_Untersiggenthal", "Aare_Thun")#, "Rekingen", "Aare_Thun", "Limmatt_Baden", "Mellingen")#, "Limmatt_Baden", "Reuss_Luzern", "Bruegg-Aegerten", "Aare_Untersiggenthal")
   value_cols <- c("discharge")
   dt_dataset <- knmi_discharge_dt
+  setnames(dt_dataset, old = "station", new = "basin", skip_absent = TRUE)
+  
+} else if (dataset == "discharge_rblick") {
+  basin_sel <- unique(knmi_discharge_dt$station)
+  basin_sel <- c("Basel Rheinhalle", "Andelfingen", "Rhine_Neuhausen", "Diepoldsau", "Aare_Untersiggenthal", "Aare_Thun")#, "Rekingen", "Aare_Thun", "Limmatt_Baden", "Mellingen")#, "Limmatt_Baden", "Reuss_Luzern", "Bruegg-Aegerten", "Aare_Untersiggenthal")
+  value_cols <- c("discharge")
+  dt_dataset <- knmi_discharge_dt_all
   setnames(dt_dataset, old = "station", new = "basin", skip_absent = TRUE)
   
 } else if (dataset == "lakelevel") {
@@ -201,7 +215,7 @@ if (plot_selection["seasonality_horizon"]) {
   statistics <- c("mean")#, "min", "max")
   
   # Compute rolling statistics
-  #rolling_stats_dt <- compute_rolling_stats(dt_subset, group_cols, value_cols)
+  rolling_stats_dt <- compute_rolling_stats(dt_subset, group_cols, value_cols)
   
   # Add "rm_" prefix to each value column
   group_cols <- c(group_cols, "DayOfYear")
@@ -209,7 +223,7 @@ if (plot_selection["seasonality_horizon"]) {
   
   # compute seasonality and produce plots
   for (stat in statistics) {
-    #seasonality_dt <- compute_seasonality(rolling_stats_dt, group_cols = group_cols, value_cols = value_cols, stat = stat, q_bot, q_top)
+    seasonality_dt <- compute_seasonality(rolling_stats_dt, group_cols = group_cols, value_cols = value_cols, stat = stat, q_bot, q_top)
     for (bsn in basin_sel) {
       dt <- seasonality_dt[basin == bsn]
       for (value_col in value_cols) {
@@ -252,6 +266,21 @@ if (plot_selection["annual_horizon_mean_diff"]) {
                                       color_col, color_col_levels, 
                                       line_col, line_col_levels, 
                                       comparison_ref, value_col, group_cols, stat, info_text, rel = TRUE)
+        
+        # Filter and print in the desired order for LaTeX table
+        ordered_rows <- dt_diff[horizon == 2100 & scenario %in% c("L", "M", "H") & variant %in% c("wet", "dry")]
+        ordered_rows <- ordered_rows[order(factor(scenario, levels = c("L", "M", "H")), 
+                                           factor(variant, levels = c("wet", "dry")))]
+        
+        # 2. Compute overall min and max across all rows
+        min_val <- round(max(dt_diff$mean_diff_rel, na.rm = TRUE), 1)
+        max_val <- round(min(dt_diff$mean_diff_rel, na.rm = TRUE), 1)
+        
+        # 3. Print single LaTeX-formatted row including all values
+        cat(paste0(
+          c(round(ordered_rows$mean_diff_rel, 1), min_val, max_val),
+          collapse = " & "), " \\\\\n")
+        
         #plot_annual_horizon_mean_diff(dt_diff, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text, y_lim = NULL, abs = TRUE)
       } # stat loop
     } # column loop
@@ -376,10 +405,10 @@ if (plot_selection["annual_boxplot"]) {
         cat("Plotting annual boxplot for", bsn, value_col, stat, "\n")
         
         dt_annual <- compute_annual_or_seasonal(dt, value_col, group_cols, statistic = stat, seasonal = FALSE)
-        dt_diff <- compute_member_differences(dt, value_col, group_cols, linking_cols, comparison_col = color_col, comparison_ref = comparison_ref, stat)
+        #dt_diff <- compute_member_differences(dt, value_col, group_cols, linking_cols, comparison_col = color_col, comparison_ref = comparison_ref, stat)
         
         plot_annual_boxplots(dt_annual, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text, rel = FALSE)
-        plot_annual_boxplots(dt_diff, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text, rel = TRUE)
+        #plot_annual_boxplots(dt_diff, plot_dir, bsn, color_col, color_col_levels, comparison_ref, value_col, group_cols, stat, info_text, rel = TRUE)
         } # stat loop
     } # column loop
   } # basin loop
@@ -474,7 +503,30 @@ if (plot_selection["seasonal_mean_diff"]) {
       } # stat loop
     } # column loop
   } # basin loop
-} # seasonal boxplot plot
+} # seasonal mean diff plot
+
+# seasonal horizon mean diff plot ------------------------------------------------------
+if (plot_selection["seasonal_horizon_mean_diff"]) {
+  
+  source(here("R_scripts", "plotting_functions", "plot_boxplots.R"))
+  
+  # generate annual boxplots
+  for (bsn in basin_sel) {
+    dt <- dt_subset[basin == bsn]
+    for (value_col in value_cols) {
+      if (all(is.na(dt[[value_col]]))) next
+      for (stat in statistics) {
+        cat("Plotting seasonal mean diff for", bsn, value_col, stat, "\n")
+        
+        combined_seasonal_horizon_mean_diff_plot(dt, plot_dir, bsn, value_col, stat, info_text)
+        #dt_diff <- compute_mean_diff_se(dt, value_col, group_cols, linking_cols, comparison_col = color_col, comparison_ref = comparison_ref, stat, seasonal = TRUE)
+        
+        #plot_seasonal_mean_diff(dt_diff, plot_dir, bsn, color_col, color_col_levels, 
+        #                        line_col, line_col_levels, value_col, group_cols, stat, info_text, y_lim = y_lim, rel = TRUE)
+      } # stat loop
+    } # column loop
+  } # basin loop
+} # seasonal horizon mean plot
 
 # monthly boxplot plot ------------------------------------------------------
 if (plot_selection["monthly_boxplot"]) {
@@ -533,6 +585,7 @@ if (plot_selection["annual_vars_change_boxplot"]) {
       combined_variables_change_boxplot_annual(dt_diff_long, plot_dir, bsn, time_period = "future")
       
     } # stat loop
+    
   } # basin loop
 } # annual vars change boxplot plot
 
@@ -546,7 +599,7 @@ if (plot_selection["half_year_vars_change_boxplot"]) {
   linking_cols <- c("basin", "run_type")
   
   color_col <- "scen_var_hor"
-  comparison_ref <- "none_none_ref"
+  comparison_ref <- "ref_ref_ref"
   
   statistics <- c("mean")#, mean, "min", "max", "7day_low")#, "min", "max", "7day_low")
   

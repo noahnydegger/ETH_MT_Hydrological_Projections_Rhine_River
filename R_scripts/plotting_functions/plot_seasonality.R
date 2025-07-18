@@ -176,7 +176,7 @@ plot_seasonality_ts <- function(
       x = "Month",
       y = paste(value_name, value_unit),
       color = NULL, #"Scenario",
-      linetype = "Variant",
+      linetype = NULL, #"Variant",
       fill = paste0(q_bot * 100, "-", q_top * 100, " % Quantile")
     ) +
     custom_theme() +
@@ -242,7 +242,7 @@ plot_seasonality_ts_combination <- function(
     
   } else if (legend == "colour") {
     legend_theme <- theme(
-      legend.position = c(1, 1.14),
+      legend.position = c(1.02, 1.17),
       legend.justification = "right"
     )
     
@@ -253,7 +253,7 @@ plot_seasonality_ts_combination <- function(
     
   } else if (legend == "line") {
     legend_theme <- theme(
-      legend.position = c(1, 1.14),
+      legend.position = c(1, 1.17),
       legend.justification = "right",
       legend.key.width = unit(2.0, "cm")  # Only for line legend
     )
@@ -319,8 +319,8 @@ plot_seasonality_ts_combination <- function(
       title = title,
       x = "",
       y = ylab,
-      color = "Scenario",
-      linetype = "Variant",
+      color = NULL,
+      linetype = NULL,
       fill = paste0(q_bot * 100, "-", q_top * 100, " % Quantile")
     ) +
     scale_color_manual(
@@ -364,7 +364,7 @@ combined_seasonality_horizon_plot <- function(dt, plot_dir, bsn, info_col, value
                                               q_bot, q_top, show_range = show_range) {
   
   titles <- c(
-    paste0("(c) 1.5°C"),
+    paste0("(c) 2033"),
     paste0("(d) 2150"),
     paste0("(a) 2050"),
     paste0("(b) 2100")
@@ -402,12 +402,12 @@ combined_seasonality_horizon_plot <- function(dt, plot_dir, bsn, info_col, value
   
   # Dynamic height
   n_horizons <- length(pls)
-  base_height <- 2
+  base_height <- 2.2
   total_height <- n_horizons * base_height
   
   # Save
   save_dir <- file.path(plot_dir, "seasonality_horizon", info_col)
-  filename <- paste0("seasonality_ts_horizon_", bsn, "_", stat, "_", value_col, info_text, ".pdf")
+  filename <- paste0("seasonality_ts_horizon_", bsn, "_", stat, "_", value_col, info_text, "report", ".pdf")
   
   save_plot(p, save_dir, filename, width = 19, height = total_height)
   

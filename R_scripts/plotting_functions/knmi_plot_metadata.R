@@ -9,7 +9,8 @@ custom_theme <- function() {
       axis.title = element_text(size = text_size, face = "bold", color = "black"),
       legend.text = element_text(size = text_size, color = "black"),  # + 5 in needed
       legend.title = element_text(size = text_size, face = "bold", color = "black"),
-      plot.title = element_text(size = text_size, face = "bold", hjust = 0.5, color = "black"),
+      plot.title = element_text(size = text_size + 5, face = "bold", hjust = 0.5, color = "black"),
+      strip.text = element_text(size = text_size, color = "black"),
       
       legend.key = element_rect(colour = NA, fill = NA),
       legend.background = element_rect(fill = "transparent", colour = NA),
@@ -42,7 +43,7 @@ save_plot <- function(plot, save_dir, file_name, width = 18, height = 6) {
 plot_info <- list(
   hydro_model = list(
     colors = c(
-      "PREVAH" = "red",
+      "PREVAH" = "grey50",
       "wflow_sbm" = "blue",
       "larsim" = "orange",
       "observation" = "black"
@@ -57,7 +58,7 @@ plot_info <- list(
       "PREVAH" = "PREVAH (WSL)",
       "wflow_sbm" = "wflow_sbm (Deltares)",
       "larsim" = "LARSIM-ME (BfG)",
-      "observation" = "Observation (FOEN)"
+      "observation" = "Observation"
     )
   ),
   scenario = list(
@@ -320,6 +321,8 @@ plot_info <- list(
       "observation" = "black",
       "hindcast" = "grey40",
       "future_V1" = "grey70",
+      "larsim" = "orange",
+      "wflow_sbm" = "blue",
       "no_sund_bc" = "red",
       "sund_bc" = "grey70",
       "with_glac_sdbc" = "darkblue",
@@ -329,6 +332,8 @@ plot_info <- list(
       "observation" = "solid",
       "hindcast" = "solid",
       "future_V1" = "solid",
+      "larsim" = "solid",
+      "wflow_sbm" = "solid",
       "no_sund_bc" = "solid",
       "sund_bc" = "solid",
       "with_glac_sdbc" = "solid",
@@ -338,6 +343,8 @@ plot_info <- list(
       "observation" = "Observation",
       "hindcast" = "Hindcast",
       "future_V1" = "KNMI'23",
+      "larsim" = "LARSIM-ME",
+      "wflow_sbm" = "wflow_sbm",
       "no_sund_bc" = "KNMI'23 no BC",
       "sund_bc" = "KNMI'23",
       "with_glac_sdbc" = "with CH2018 glacier",# "with CH2018 glacier, with sund BC",
